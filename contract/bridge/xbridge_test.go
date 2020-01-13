@@ -54,6 +54,9 @@ func (c *codeInstance) ResourceUsed() contract.Limits {
 func (c *codeInstance) Release() {
 }
 
+func (c *codeInstance) Abort(msg string) {
+}
+
 func (c *codeInstance) testPut(args map[string][]byte) ([]byte, error) {
 	{
 		_, err := c.syscall.PutObject(context.TODO(), &pb.PutRequest{
@@ -103,8 +106,8 @@ func TestExecutorMethod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(resp) != "dummy:TestMethod" {
-			t.Errorf("expect dummy:TestMethod, got `%s`", resp)
+		if string(resp.Body) != "dummy:TestMethod" {
+			t.Errorf("expect dummy:TestMethod, got `%s`", resp.Body)
 		}
 	})
 }
@@ -134,8 +137,8 @@ func TestExecutorArgs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(resp) != "hello:world" {
-			t.Errorf("expect hello:world, got `%s`", resp)
+		if string(resp.Body) != "hello:world" {
+			t.Errorf("expect hello:world, got `%s`", resp.Body)
 		}
 	})
 }
@@ -165,8 +168,8 @@ func TestExecutorSyscall(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(resp) != "world" {
-			t.Errorf("expect world, got `%s`", resp)
+		if string(resp.Body) != "world" {
+			t.Errorf("expect world, got `%s`", resp.Body)
 		}
 	})
 }

@@ -6,10 +6,9 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/xuperchain/log15"
+	log "github.com/xuperchain/log15"
 	"github.com/xuperchain/xuperunion/kv/kvdb"
 	"github.com/xuperchain/xuperunion/pb"
-	"github.com/xuperchain/xuperunion/pluginmgr"
 	xmodel_pb "github.com/xuperchain/xuperunion/xmodel/pb"
 )
 
@@ -70,40 +69,30 @@ func saveUnconfirmTx(tx *pb.Transaction, batch kvdb.Batch) error {
 }
 
 func openDB(dbPath string, logger log.Logger) (kvdb.Database, error) {
-	plgMgr, plgErr := pluginmgr.GetPluginMgr()
-	if plgErr != nil {
-		logger.Warn("fail to get plugin manager")
-		return nil, plgErr
+	// new kvdb instance
+	kvParam := &kvdb.KVParameter{
+		DBPath:                dbPath,
+		KVEngineType:          "default",
+		MemCacheSize:          128,
+		FileHandlersCacheSize: 512,
+		OtherPaths:            []string{},
 	}
-	var baseDB kvdb.Database
-	soInst, err := plgMgr.PluginMgr.CreatePluginInstance("kv", "default")
+	baseDB, err := kvdb.NewKVDBInstance(kvParam)
 	if err != nil {
-		logger.Warn("fail to create plugin instance", "kvtype", "default")
-		return nil, err
-	}
-	baseDB = soInst.(kvdb.Database)
-	err = baseDB.Open(dbPath, map[string]interface{}{
-		"cache":     128,
-		"fds":       512,
-		"dataPaths": []string{},
-	})
-	if err != nil {
-		logger.Warn("xmodel::openDB failed to open db", "dbPath", dbPath)
+		logger.Warn("xmodel::openDB failed to open db", "dbPath", dbPath, "err", err)
 		return nil, err
 	}
 	return baseDB, nil
 }
 
 // 快速对写集合排序
-type pdSlice []xmodel_pb.PureData
+type pdSlice []*xmodel_pb.PureData
 
 // newPdSlice new a slice instance for PureData
 func newPdSlice(vpd []*xmodel_pb.PureData) pdSlice {
-	pds := []xmodel_pb.PureData{}
-	for _, v := range vpd {
-		pds = append(pds, *v)
-	}
-	return pds
+	s := make([]*xmodel_pb.PureData, len(vpd))
+	copy(s, vpd)
+	return s
 }
 
 // Len length of slice of PureData
@@ -118,24 +107,24 @@ func (pds pdSlice) Swap(i, j int) {
 
 // Less compare two pureData elements with pureData's key in a slice
 func (pds pdSlice) Less(i, j int) bool {
-	rawKeyI := string(makeRawKey(pds[i].GetBucket(), pds[i].GetKey()))
-	rawKeyJ := string(makeRawKey(pds[j].GetBucket(), pds[j].GetKey()))
-	if rawKeyI == rawKeyJ {
+	rawKeyI := makeRawKey(pds[i].GetBucket(), pds[i].GetKey())
+	rawKeyJ := makeRawKey(pds[j].GetBucket(), pds[j].GetKey())
+	ret := bytes.Compare(rawKeyI, rawKeyJ)
+	if ret == 0 {
 		// 注: 正常应该无法走到这个逻辑，因为写集合中的key一定是唯一的
-		return string(pds[i].GetValue()) < string(pds[j].GetValue())
+		return bytes.Compare(pds[i].GetValue(), pds[j].GetValue()) < 0
 	}
-	return rawKeyI < rawKeyJ
+	return ret < 0
 }
 
-func equal(pd, vpd xmodel_pb.PureData) bool {
-	rawKeyI := string(makeRawKey(pd.GetBucket(), pd.GetKey()))
-	rawKeyJ := string(makeRawKey(vpd.GetBucket(), vpd.GetKey()))
-	if rawKeyI != rawKeyJ {
+func equal(pd, vpd *xmodel_pb.PureData) bool {
+	rawKeyI := makeRawKey(pd.GetBucket(), pd.GetKey())
+	rawKeyJ := makeRawKey(vpd.GetBucket(), vpd.GetKey())
+	ret := bytes.Compare(rawKeyI, rawKeyJ)
+	if ret != 0 {
 		return false
 	}
-	valI := string(pd.GetValue())
-	valJ := string(vpd.GetValue())
-	return valI == valJ
+	return bytes.Equal(pd.GetValue(), vpd.GetValue())
 }
 
 // Equal check if two PureData object equal

@@ -7,6 +7,7 @@ import (
 	"github.com/xuperchain/xuperunion/kv/kvdb"
 	"github.com/xuperchain/xuperunion/ledger"
 	"github.com/xuperchain/xuperunion/pb"
+	"github.com/xuperchain/xuperunion/xmodel"
 )
 
 // KernelModuleName is the name of kernel contract
@@ -15,10 +16,25 @@ const KernelModuleName = "kernel"
 // ConsensusModueName is the name of consensus contract
 const ConsensusModueName = "consensus"
 
-// AutoGenWhiteList 为必须通过提案机制才能触发调用的智能合约名单
-var AutoGenWhiteList = map[string]bool{
-	"consensus.update_consensus": true,
-	"kernel.UpdateMaxBlockSize":  true,
+// UtxoMetaRegister in avoid to being refered in a cycle way
+type UtxoMetaRegister interface {
+	GetMaxBlockSize() int64
+	UpdateMaxBlockSize(int64, kvdb.Batch) error
+	GetReservedContracts() []*pb.InvokeRequest
+	UpdateReservedContracts([]*pb.InvokeRequest, kvdb.Batch) error
+	GetForbiddenContract() *pb.InvokeRequest
+	UpdateForbiddenContract(*pb.InvokeRequest, kvdb.Batch) error
+	GetNewAccountResourceAmount() int64
+	UpdateNewAccountResourceAmount(int64, kvdb.Batch) error
+	QueryTx(txid []byte) (*pb.Transaction, error)
+	GetXModel() *xmodel.XModel
+	// Get irreversible slide window
+	GetIrreversibleSlideWindow() int64
+	// Update irreversible slide window
+	UpdateIrreversibleSlideWindow(nextIrreversibleSlideWindow int64, batch kvdb.Batch) error
+	// Get gas price
+	GetGasPrice() *pb.GasPrice
+	UpdateGasPrice(*pb.GasPrice, kvdb.Batch) error
 }
 
 // TxDesc is the description to running a contract
@@ -46,6 +62,7 @@ type TxContext struct {
 	UtxoBatch kvdb.Batch //如果合约机和UtxoVM共用DB, 可以将修改打包到这个batch确保原子性
 	//... 其他的需要UtxoVM与合约机共享的也可以放到这里
 	Block     *pb.InternalBlock
+	UtxoMeta  UtxoMetaRegister
 	LedgerObj *ledger.Ledger
 	IsUndo    bool
 }

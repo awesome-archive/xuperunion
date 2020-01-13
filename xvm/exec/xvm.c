@@ -30,6 +30,10 @@
 
 void (*wasm_rt_trap)(wasm_rt_trap_t code) = NULL;
 
+static void* xvm_malloc(size_t size);
+static void* xvm_realloc(void* ptr, size_t size);
+static void xvm_free(void* ptr);
+
 static void _wasm_rt_trap(wasm_rt_trap_t code) {
   fprintf(stderr, "panic:%d\n", code);
   abort();
@@ -57,10 +61,10 @@ static bool func_types_are_equal(struct FuncType* a, struct FuncType* b) {
 
 void free_func_type(struct FuncType* ftype) {
   if (ftype->params != NULL) {
-    free(ftype->params);
+    xvm_free(ftype->params);
   }
   if (ftype->results != NULL) {
-    free(ftype->results);
+    xvm_free(ftype->results);
   }
 }
 
@@ -72,9 +76,9 @@ static uint32_t wasm_rt_register_func_type(void* context,
   xvm_code_t* code = context;
   struct FuncType func_type;
   func_type.param_count = param_count;
-  func_type.params = malloc(param_count * sizeof(wasm_rt_type_t));
+  func_type.params = xvm_malloc(param_count * sizeof(wasm_rt_type_t));
   func_type.result_count = result_count;
-  func_type.results = malloc(result_count * sizeof(wasm_rt_type_t));
+  func_type.results = xvm_malloc(result_count * sizeof(wasm_rt_type_t));
 
   va_list args;
   va_start(args, result_count);
@@ -88,14 +92,14 @@ static uint32_t wasm_rt_register_func_type(void* context,
 
   for (i = 0; i < code->func_type_count; ++i) {
     if (func_types_are_equal(&code->func_types[i], &func_type)) {
-      free(func_type.params);
-      free(func_type.results);
+      xvm_free(func_type.params);
+      xvm_free(func_type.results);
       return i + 1;
     }
   }
 
   uint32_t idx = code->func_type_count++;
-  code->func_types = realloc(code->func_types, code->func_type_count * sizeof(struct FuncType));
+  code->func_types = xvm_realloc(code->func_types, code->func_type_count * sizeof(struct FuncType));
   code->func_types[idx] = func_type;
   return idx + 1;
 }
@@ -111,18 +115,24 @@ static void wasm_rt_allocate_memory(void* context,
   memory->max_pages = max_pages;
   memory->size = initial_pages * PAGE_SIZE;
   if (memory->size != 0) {
-    memory->data = calloc(memory->size, 1);
-  }
-  /* memory->data = mmap(0, memory->size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); */
-  if (memory->data == MAP_FAILED) {
-    wasm_rt_trap(0);
+    memory->data = mmap(0, memory->size, PROT_READ|PROT_WRITE,
+    MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (memory->data == MAP_FAILED) {
+      xvm_raise(TRAP_NO_MEMORY);
+    }
   }
   xvm_context_t* ctx = context;
   ctx->mem = memory;
 }
 
+static void wasm_rt_free_memory(wasm_rt_memory_t* mem) {
+  munmap(mem->data, mem->size);
+}
+
 static uint32_t wasm_rt_grow_memory(void* context, wasm_rt_memory_t* memory, uint32_t delta) {
-  /* wasm_rt_trap(0); */
+  // do not support grow memory
+  wasm_rt_trap(WASM_RT_TRAP_OOB);
+
   uint32_t old_pages = memory->pages;
   uint32_t new_pages = memory->pages + delta;
   if (new_pages < old_pages || new_pages > memory->max_pages) {
@@ -130,7 +140,7 @@ static uint32_t wasm_rt_grow_memory(void* context, wasm_rt_memory_t* memory, uin
   }
   memory->pages = new_pages;
   memory->size = new_pages * PAGE_SIZE;
-  memory->data = realloc(memory->data, memory->size);
+  memory->data = xvm_realloc(memory->data, memory->size);
   memset(memory->data + old_pages * PAGE_SIZE, 0, delta * PAGE_SIZE);
   return old_pages;
 }
@@ -145,14 +155,14 @@ static void wasm_rt_allocate_table(void* context,
   table->size = elements;
   table->max_size = max_elements;
   if (table->size != 0) {
-    table->data = calloc(table->size, sizeof(wasm_rt_elem_t));
+    table->data = xvm_malloc(table->size*sizeof(wasm_rt_elem_t));
   }
   xvm_context_t* ctx = context;
   ctx->table = table;
 }
 
 static void* wasm_rt_malloc(void* context, uint32_t size) {
-  return calloc(size, 1);
+  return xvm_malloc(size);
 }
 
 static wasm_rt_func_handle_t wasm_rt_resolve_func(void* context, char* module, char* name) {
@@ -168,7 +178,7 @@ static uint32_t wasm_rt_call_func(void* context, wasm_rt_func_handle_t hfunc, ui
 }
 
 // TODO: 每个context有单独的全局变量设置?
-static double wasm_rt_resolve_global(void* context, char* module, char* name) {
+static int64_t wasm_rt_resolve_global(void* context, char* module, char* name) {
   xvm_context_t* ctx = context;
   return ctx->code->resolver.resolve_global(ctx->code->resolver.env, module, name);
 }
@@ -222,9 +232,18 @@ xvm_code_t* xvm_new_code(char* module_path, xvm_resolver_t resolver) {
     dlclose(dlhandle);
     return NULL;
   }
-  xvm_code_t* code = calloc(sizeof(xvm_code_t), 1);
+
+  void* (*new_handle_func)(void*) = dlsym(dlhandle, "new_handle");
+  if (new_handle_func == NULL) {
+    fprintf(stderr, "new_handle function not found\n");
+    dlclose(dlhandle);
+    return 0;
+  }
+
+  xvm_code_t* code = xvm_malloc(sizeof(xvm_code_t));
   code->dlhandle = dlhandle;
   code->resolver = resolver;
+  code->new_handle_func = new_handle_func;
   (*init_func_types)(code);
   (*init_import_funcs)(code);
   return code;
@@ -236,12 +255,12 @@ void xvm_release_code(xvm_code_t* code) {
     for (; i<code->func_type_count; i++) {
       free_func_type(code->func_types + i);
     }
-    free(code->func_types);
+    xvm_free(code->func_types);
   }
   if (code->dlhandle != NULL) {
     dlclose(code->dlhandle);
   }
-  free(code);
+  xvm_free(code);
   memset((void*)code, 0, sizeof(xvm_code_t));
 }
 
@@ -249,56 +268,83 @@ void xvm_release_code(xvm_code_t* code) {
  * xvm_context_t相关代码
  */
 
-// FIXME: 修改访问暴露变量的方式
+// NOTE: must sync with c-writer.cc CWriter::WriteHandleFields
 struct _wasm_rt_handle_t {
   void* user_ctx;
   wasm_rt_gas_t gas;
+  uint32_t call_stack_depth;
+  uint32_t static_top;
 };
 
 xvm_context_t* xvm_new_context(xvm_code_t* code) {
-  xvm_context_t* ctx = calloc(sizeof(xvm_context_t), 1);
+  xvm_context_t* ctx = xvm_malloc(sizeof(xvm_context_t));
   ctx->code = code;
   return ctx;
 }
 
-int xvm_init_context(xvm_context_t* ctx, xvm_code_t* code) {
-  void*(*new_handle_func)(void*) = dlsym(code->dlhandle, "new_handle");
-  if (new_handle_func == NULL) {
-    fprintf(stderr, "new_handle function not found\n");
-    return 0;
-  }
+int xvm_init_context(xvm_context_t* ctx, xvm_code_t* code, uint64_t gas_limit) {
   ctx->code = code;
-  ctx->module_handle = new_handle_func(ctx);
+  ctx->module_handle = code->new_handle_func(ctx);
+  struct _wasm_rt_handle_t* _handle = ctx->module_handle;
+  _handle->gas.limit = gas_limit;
   return 1;
 }
 
 void xvm_release_context(xvm_context_t* ctx) {
   if (ctx->mem != NULL) {
-    /* munmap(ctx->mem->data, ctx->mem->size); */
-    free(ctx->mem->data);
+    wasm_rt_free_memory(ctx->mem);
   }
   if (ctx->table != NULL) {
-    free(ctx->table->data);
+    xvm_free(ctx->table->data);
   }
   if (ctx->module_handle != NULL) {
-    free(ctx->module_handle);
+    xvm_free(ctx->module_handle);
   }
   memset((void*)ctx, 0, sizeof(xvm_context_t));
 }
 
-uint32_t xvm_call(xvm_context_t* ctx, char* name, int64_t* params, int64_t param_len, wasm_rt_gas_t* gas, int64_t* ret) {
+uint32_t xvm_mem_static_top(xvm_context_t* ctx) {
+    struct _wasm_rt_handle_t* _handle = ctx->module_handle;
+    return _handle->static_top;
+}
+
+uint32_t xvm_call(xvm_context_t* ctx, char* name, int64_t* params, int64_t param_len, int64_t* ret) {
   void* func = dlsym(ctx->code->dlhandle, name);
   if (func == NULL) {
     return 0;
   }
   struct _wasm_rt_handle_t* _handle = ctx->module_handle;
-  if (gas != NULL) {
-    _handle->gas.limit = gas->limit;
-  }
   int64_t (*real_func)(void*, int64_t*, int64_t) = func;
   *ret = real_func(ctx->module_handle, params, param_len);
-  if (gas != NULL) {
-    gas->used = _handle->gas.used;
-  }
   return 1;
+}
+
+void xvm_reset_gas_used(xvm_context_t* ctx) {
+    struct _wasm_rt_handle_t* _handle = ctx->module_handle;
+    _handle->gas.used = 0;
+}
+
+uint64_t xvm_gas_used(xvm_context_t* ctx) {
+    struct _wasm_rt_handle_t* _handle = ctx->module_handle;
+    return _handle->gas.used;
+}
+
+static void* xvm_malloc(size_t size) {
+  void* ptr = calloc(size, 1);
+  if (ptr == NULL) {
+    xvm_raise(TRAP_NO_MEMORY);
+  }
+  return ptr;
+}
+
+static void* xvm_realloc(void* ptr, size_t size) {
+  void* new_ptr = realloc(ptr, size);
+  if (new_ptr == NULL) {
+    xvm_raise(TRAP_NO_MEMORY);
+  }
+  return new_ptr;
+}
+
+static void xvm_free(void* ptr) {
+  free(ptr);
 }

@@ -19,13 +19,13 @@ type Runtime struct {
 	exited   bool
 	global   *js.Global
 	jsvm     *js.VM
-	ctx      *exec.Context
+	ctx      exec.Context
 
 	timeOrigin time.Time
 }
 
 // RegisterRuntime 用于向exec.Context里面注册一个初始化好的js Runtime
-func RegisterRuntime(ctx *exec.Context) *Runtime {
+func RegisterRuntime(ctx exec.Context) *Runtime {
 	rt := &Runtime{
 		global:     js.NewGlobal(),
 		timeOrigin: time.Now(),
@@ -153,4 +153,30 @@ func (rt *Runtime) syscallJsValueLength(ref js.Ref) int64 {
 }
 
 func (rt *Runtime) syscallJsValueInstanceOf(v, t js.Ref) {
+}
+
+func (rt *Runtime) syscallJsCopyBytesToGo(dst []byte, src js.Ref) (int64, bool) {
+	v := rt.jsvm.Value(src)
+	if v == nil {
+		return 0, false
+	}
+	slice, err := v.Bytes()
+	if err != nil {
+		return 0, false
+	}
+	n := copy(dst, slice)
+	return int64(n), true
+}
+
+func (rt *Runtime) syscallJsCopyBytesToJS(dst js.Ref, src []byte) (int64, bool) {
+	v := rt.jsvm.Value(dst)
+	if v == nil {
+		return 0, false
+	}
+	slice, err := v.Bytes()
+	if err != nil {
+		return 0, false
+	}
+	n := copy(slice, src)
+	return int64(n), true
 }

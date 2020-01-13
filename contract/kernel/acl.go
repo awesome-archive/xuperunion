@@ -4,15 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/xuperchain/xuperunion/contract"
 	"github.com/xuperchain/xuperunion/pb"
 	"github.com/xuperchain/xuperunion/permission/acl"
 	"github.com/xuperchain/xuperunion/permission/acl/utils"
 	"github.com/xuperchain/xuperunion/xmodel"
-)
-
-const (
-	newAccountGasAmount = 1000
-	setACLGasAmount     = 10
 )
 
 // NewAccountMethod define NewAccountMethod type
@@ -66,9 +62,9 @@ func validACL(acl *pb.Acl) error {
 }
 
 // Invoke NewAccount method implementation
-func (na *NewAccountMethod) Invoke(ctx *KContext, args map[string][]byte) ([]byte, error) {
-	if ctx.ResourceLimit.XFee < newAccountGasAmount {
-		return nil, fmt.Errorf("gas not enough, expect no less than %d", newAccountGasAmount)
+func (na *NewAccountMethod) Invoke(ctx *KContext, args map[string][]byte) (*contract.Response, error) {
+	if ctx.ResourceLimit.XFee < ctx.NewAccountResourceAmount {
+		return nil, fmt.Errorf("gas not enough, expect no less than %d", ctx.NewAccountResourceAmount)
 	}
 	// json -> pb.Acl
 	accountName := args["account_name"]
@@ -84,7 +80,7 @@ func (na *NewAccountMethod) Invoke(ctx *KContext, args map[string][]byte) ([]byt
 		return nil, validErr
 	}
 
-	bcname := ctx.ModelCache.GetBcname()
+	bcname := ctx.ContextConfig.BCName
 	if bcname == "" {
 		return nil, fmt.Errorf("block name is empty")
 	}
@@ -112,15 +108,18 @@ func (na *NewAccountMethod) Invoke(ctx *KContext, args map[string][]byte) ([]byt
 		return nil, err
 	}
 
-	ctx.AddXFeeUsed(newAccountGasAmount)
+	ctx.AddXFeeUsed(ctx.NewAccountResourceAmount)
 
-	return aclJSON, nil
+	return &contract.Response{
+		Status: contract.StatusOK,
+		Body:   aclJSON,
+	}, nil
 }
 
 // Invoke SetAccountACL method implementation
-func (saa *SetAccountACLMethod) Invoke(ctx *KContext, args map[string][]byte) ([]byte, error) {
-	if ctx.ResourceLimit.XFee < setACLGasAmount {
-		return nil, fmt.Errorf("gas not enough, expect no less than %d", setACLGasAmount)
+func (saa *SetAccountACLMethod) Invoke(ctx *KContext, args map[string][]byte) (*contract.Response, error) {
+	if ctx.ResourceLimit.XFee < ctx.NewAccountResourceAmount/1000 {
+		return nil, fmt.Errorf("gas not enough, expect no less than %d", ctx.NewAccountResourceAmount/1000)
 	}
 	// json -> pb.Acl
 	accountName := args["account_name"]
@@ -149,14 +148,18 @@ func (saa *SetAccountACLMethod) Invoke(ctx *KContext, args map[string][]byte) ([
 		return nil, err
 	}
 
-	ctx.AddXFeeUsed(setACLGasAmount)
-	return aclJSON, nil
+	ctx.AddXFeeUsed(ctx.NewAccountResourceAmount / 1000)
+
+	return &contract.Response{
+		Status: contract.StatusOK,
+		Body:   aclJSON,
+	}, nil
 }
 
 // Invoke SetMethodACL method implementation
-func (sma *SetMethodACLMethod) Invoke(ctx *KContext, args map[string][]byte) ([]byte, error) {
-	if ctx.ResourceLimit.XFee < setACLGasAmount {
-		return nil, fmt.Errorf("gas not enough, expect no less than %d", setACLGasAmount)
+func (sma *SetMethodACLMethod) Invoke(ctx *KContext, args map[string][]byte) (*contract.Response, error) {
+	if ctx.ResourceLimit.XFee < ctx.NewAccountResourceAmount/1000 {
+		return nil, fmt.Errorf("gas not enough, expect no less than %d", ctx.NewAccountResourceAmount/1000)
 	}
 	contractNameBuf := args["contract_name"]
 	methodNameBuf := args["method_name"]
@@ -180,6 +183,9 @@ func (sma *SetMethodACLMethod) Invoke(ctx *KContext, args map[string][]byte) ([]
 		return nil, err
 	}
 
-	ctx.AddXFeeUsed(setACLGasAmount)
-	return aclJSON, nil
+	ctx.AddXFeeUsed(ctx.NewAccountResourceAmount / 1000)
+	return &contract.Response{
+		Status: contract.StatusOK,
+		Body:   aclJSON,
+	}, nil
 }

@@ -19,6 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/xuperchain/xuperunion/contract"
 	crypto_client "github.com/xuperchain/xuperunion/crypto/client"
 	"github.com/xuperchain/xuperunion/global"
 	"github.com/xuperchain/xuperunion/pb"
@@ -51,6 +52,9 @@ type CommTrans struct {
 	Keys         string
 	XchainClient pb.XchainClient
 	CryptoType   string
+
+	// DebugTx if enabled, tx will be printed instead of being posted
+	DebugTx bool
 }
 
 // GenerateTx generate raw tx
@@ -78,12 +82,17 @@ func (c *CommTrans) GenPreExeRes(ctx context.Context) (
 				Args:       c.Args,
 			})
 		} else {
-			preExeReqs = append(preExeReqs, &pb.InvokeRequest{
+			invokeReq := &pb.InvokeRequest{
 				ModuleName:   c.ModuleName,
 				ContractName: c.ContractName,
 				MethodName:   c.MethodName,
 				Args:         c.Args,
-			})
+			}
+			// transfer to contract
+			if c.To == c.ContractName {
+				invokeReq.Amount = c.Amount
+			}
+			preExeReqs = append(preExeReqs, invokeReq)
 		}
 	} else {
 		tmpReq, err := c.GetInvokeRequestFromDesc()
@@ -121,8 +130,11 @@ func (c *CommTrans) GenPreExeRes(ctx context.Context) (
 	if err != nil {
 		return nil, nil, fmt.Errorf("PreExe contract response : %v, logid:%s", err, preExeRPCReq.Header.Logid)
 	}
-	for _, res := range preExeRPCRes.Response.Response {
-		fmt.Printf("contract response: %s\n", string(res))
+	for _, res := range preExeRPCRes.Response.Responses {
+		if res.Status >= contract.StatusErrorThreshold {
+			return nil, nil, fmt.Errorf("contract error status:%d message:%s", res.Status, res.Message)
+		}
+		fmt.Printf("contract response: %s\n", string(res.Body))
 	}
 	return preExeRPCRes, preExeRPCRes.Response.Requests, nil
 }
@@ -186,18 +198,26 @@ func (c *CommTrans) GenRawTx(ctx context.Context, desc []byte, preExeRes *pb.Inv
 		gasUsed = preExeRes.GasUsed
 		fmt.Printf("The gas you cousume is: %v\n", gasUsed)
 	}
+
+	if preExeRes.GetUtxoInputs() != nil {
+		tx.TxInputs = append(tx.TxInputs, preExeRes.GetUtxoInputs()...)
+	}
+	if preExeRes.GetUtxoOutputs() != nil {
+		tx.TxOutputs = append(tx.TxOutputs, preExeRes.GetUtxoOutputs()...)
+	}
+
 	txOutputs, totalNeed, err := c.GenTxOutputs(gasUsed)
 	if err != nil {
 		return nil, err
 	}
-	tx.TxOutputs = txOutputs
+	tx.TxOutputs = append(tx.TxOutputs, txOutputs...)
 
 	txInputs, deltaTxOutput, err := c.GenTxInputs(ctx, totalNeed)
 	if err != nil {
 		return nil, err
 	}
 
-	tx.TxInputs = txInputs
+	tx.TxInputs = append(tx.TxInputs, txInputs...)
 	if deltaTxOutput != nil {
 		tx.TxOutputs = append(tx.TxOutputs, deltaTxOutput)
 	}
@@ -221,6 +241,9 @@ func (c *CommTrans) GenRawTx(ctx context.Context, desc []byte, preExeRes *pb.Inv
 
 // genInitiator generate initiator of transaction
 func (c *CommTrans) genInitiator() (string, error) {
+	if c.From != "" {
+		return c.From, nil
+	}
 	fromAddr, err := readAddress(c.Keys)
 	if err != nil {
 		return "", err
@@ -262,7 +285,7 @@ func (c *CommTrans) GenTxOutputs(gasUsed int64) ([]*pb.TxOutput, *big.Int, error
 
 	// 组装txOutputs
 	bigZero := big.NewInt(0)
-	totalNeed := bigZero
+	totalNeed := big.NewInt(0)
 	txOutputs := []*pb.TxOutput{}
 	for _, acc := range accounts {
 		amount, ok := big.NewInt(0).SetString(acc.Amount, 10)
@@ -354,6 +377,12 @@ func (c *CommTrans) Transfer(ctx context.Context) error {
 	tx, err := c.GenerateTx(ctx)
 	if err != nil {
 		return err
+	}
+	if c.DebugTx {
+		ttx := FromPBTx(tx)
+		out, _ := json.MarshalIndent(ttx, "", "  ")
+		fmt.Println(string(out))
+		return nil
 	}
 
 	return c.SendTx(ctx, tx)
@@ -586,4 +615,55 @@ func printTx(tx *pb.Transaction) error {
 	fmt.Println(string(output))
 
 	return nil
+}
+
+func (c *CommTrans) GenTxInputsWithMergeUTXO(ctx context.Context) ([]*pb.TxInput, *pb.TxOutput, error) {
+	var fromAddr string
+	var err error
+	if c.From != "" {
+		fromAddr = c.From
+	} else {
+		fromAddr, err = readAddress(c.Keys)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	utxoInput := &pb.UtxoInput{
+		Bcname:   c.ChainName,
+		Address:  fromAddr,
+		NeedLock: true,
+	}
+
+	utxoOutputs, err := c.XchainClient.SelectUTXOBySize(ctx, utxoInput)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%v, details:%v", ErrSelectUtxo, err)
+	}
+	if utxoOutputs.Header.Error != pb.XChainErrorEnum_SUCCESS {
+		return nil, nil, fmt.Errorf("%v, details:%v", ErrSelectUtxo, utxoOutputs.Header.Error)
+	}
+
+	// 组装txInputs
+	var txInputs []*pb.TxInput
+	var txOutput *pb.TxOutput
+	for _, utxo := range utxoOutputs.UtxoList {
+		txInput := &pb.TxInput{
+			RefTxid:   utxo.RefTxid,
+			RefOffset: utxo.RefOffset,
+			FromAddr:  utxo.ToAddr,
+			Amount:    utxo.Amount,
+		}
+		txInputs = append(txInputs, txInput)
+	}
+
+	utxoTotal, ok := big.NewInt(0).SetString(utxoOutputs.TotalSelected, 10)
+	if !ok {
+		return nil, nil, ErrSelectUtxo
+	}
+	txOutput = &pb.TxOutput{
+		ToAddr: []byte(fromAddr),
+		Amount: utxoTotal.Bytes(),
+	}
+
+	return txInputs, txOutput, nil
 }

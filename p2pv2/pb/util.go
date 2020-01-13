@@ -3,6 +3,8 @@ package xuperp2p
 import (
 	"hash/crc32"
 
+	"github.com/golang/snappy"
+
 	"github.com/xuperchain/xuperunion/global"
 )
 
@@ -10,6 +12,7 @@ import (
 const (
 	XuperMsgVersion1 = "1.0.0"
 	XuperMsgVersion2 = "2.0.0"
+	XuperMsgVersion3 = "3.0.0"
 )
 
 // NewXuperMessage create P2P message instance with given params
@@ -29,9 +32,6 @@ func NewXuperMessage(version, bcName, lgid string, tp XuperMessage_MessageType, 
 	} else {
 		msg.Header.Logid = lgid
 	}
-	if version > XuperMsgVersion1 {
-		msg.Header.ErrorType = ep
-	}
 	msg.Header.DataCheckSum = CalDataCheckSum(msg)
 	return msg, nil
 }
@@ -39,6 +39,35 @@ func NewXuperMessage(version, bcName, lgid string, tp XuperMessage_MessageType, 
 // CalDataCheckSum calculate checksum of message
 func CalDataCheckSum(msg *XuperMessage) uint32 {
 	return crc32.ChecksumIEEE(msg.GetData().GetMsgInfo())
+}
+
+// Compressed compress msg
+func Compress(msg *XuperMessage) *XuperMessage {
+	if msg == nil || msg.GetHeader().GetEnableCompress() {
+		return msg
+	}
+	msg.Data.MsgInfo = snappy.Encode(nil, msg.Data.MsgInfo)
+	msg.Header.EnableCompress = true
+	msg.Header.DataCheckSum = CalDataCheckSum(msg)
+
+	return msg
+}
+
+// Uncompressed get uncompressed msg
+func Uncompress(msg *XuperMessage) ([]byte, error) {
+	originalMsg := msg.GetData().GetMsgInfo()
+	var uncompressedMsg []byte
+	var decodeErr error
+	msgHeader := msg.GetHeader()
+	if msgHeader != nil && msgHeader.GetEnableCompress() {
+		uncompressedMsg, decodeErr = snappy.Decode(nil, originalMsg)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+	} else {
+		uncompressedMsg = originalMsg
+	}
+	return uncompressedMsg, nil
 }
 
 // VerifyDataCheckSum verify the checksum of message

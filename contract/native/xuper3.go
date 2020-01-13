@@ -3,32 +3,20 @@ package native
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"github.com/docker/go-connections/sockets"
 	"github.com/xuperchain/xuperunion/common"
 	"github.com/xuperchain/xuperunion/contract"
 	"github.com/xuperchain/xuperunion/contract/bridge"
 	pb "github.com/xuperchain/xuperunion/contractsdk/go/pb"
+	pbrpc "github.com/xuperchain/xuperunion/contractsdk/go/pbrpc"
 	"google.golang.org/grpc"
 )
 
 // RegisterSyscallService implements bridge.Executor
 func (gscf *GeneralSCFramework) RegisterSyscallService(service *bridge.SyscallService) {
 	rpcServer := grpc.NewServer()
-	pb.RegisterSyscallServer(rpcServer, service)
-	uid, gid := os.Getuid(), os.Getgid()
-
-	relpath, err := RelPathOfCWD(gscf.chainSock3Path)
-	if err != nil {
-		panic(err)
-	}
-	listener, err := sockets.NewUnixSocketWithOpts(relpath, sockets.WithChown(uid, gid), sockets.WithChmod(0660))
-	if err != nil {
-		gscf.Error("NewUnixSocketWithOpts error", "error", err, "chainSockPath", gscf.chainSock3Path)
-		panic(err)
-	}
-	go rpcServer.Serve(listener)
+	pbrpc.RegisterSyscallServer(rpcServer, service)
+	go rpcServer.Serve(gscf.syscallListener)
 }
 
 // NewInstance implements bridge.Executor
@@ -84,4 +72,7 @@ func (n *nativeInstance) Exec() error {
 	}
 
 	return nil
+}
+
+func (n *nativeInstance) Abort(msg string) {
 }

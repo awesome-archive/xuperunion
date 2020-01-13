@@ -33,6 +33,12 @@ type RootConfig struct {
 		HeightGap int64   `json:"height_gap"`
 		Ratio     float64 `json:"ratio"`
 	} `json:"award_decay"`
+	GasPrice struct {
+		CpuRate  int64 `json:"cpu_rate"`
+		MemRate  int64 `json:"mem_rate"`
+		DiskRate int64 `json:"disk_rate"`
+		XfeeRate int64 `json:"xfee_rate"`
+	} `json:"gas_price"`
 	Decimals          string                 `json:"decimals"`
 	GenesisConsensus  map[string]interface{} `json:"genesis_consensus"`
 	ReservedContracts []InvokeRequest        `json:"reserved_contracts"`
@@ -40,6 +46,18 @@ type RootConfig struct {
 		Account string `json:"account"`
 	} `json:"reserved_whitelist"`
 	ForbiddenContract InvokeRequest `json:"forbidden_contract"`
+	// NewAccountResourceAmount the amount of creating a new contract account
+	NewAccountResourceAmount int64 `json:"new_account_resource_amount"`
+	// IrreversibleSlideWindow
+	IrreversibleSlideWindow string `json:"irreversibleslidewindow"`
+}
+
+// GasPrice define gas rate for utxo
+type GasPrice struct {
+	CpuRate  int64 `json:"cpu_rate" mapstructure:"cpu_rate"`
+	MemRate  int64 `json:"mem_rate" mapstructure:"mem_rate"`
+	DiskRate int64 `json:"disk_rate" mapstructure:"disk_rate"`
+	XfeeRate int64 `json:"xfee_rate" mapstructure:"xfee_rate"`
 }
 
 // InvokeRequest define genesis reserved_contracts configure
@@ -67,11 +85,22 @@ func InvokeRequestFromJSON2Pb(jsonRequest []InvokeRequest) ([]*pb.InvokeRequest,
 	return requestsWithPb, nil
 }
 
+// GetIrreversibleSlideWindow get irreversible slide window
+func (rc *RootConfig) GetIrreversibleSlideWindow() int64 {
+	irreversibleSlideWindow, _ := strconv.Atoi(rc.IrreversibleSlideWindow)
+	return int64(irreversibleSlideWindow)
+}
+
 // GetMaxBlockSizeInByte get max block size in Byte
 func (rc *RootConfig) GetMaxBlockSizeInByte() (n int64) {
 	maxSizeMB, _ := strconv.Atoi(rc.MaxBlockSize)
 	n = int64(maxSizeMB) << 20
 	return
+}
+
+// GetNewAccountResourceAmount get the resource amount of new an account
+func (rc *RootConfig) GetNewAccountResourceAmount() int64 {
+	return rc.NewAccountResourceAmount
 }
 
 // GetGenesisConsensus get consensus config of genesis block
@@ -91,6 +120,10 @@ func (rc *RootConfig) GetGenesisConsensus() (map[string]interface{}, error) {
 // GetReservedContract get default contract config of genesis block
 func (rc *RootConfig) GetReservedContract() ([]*pb.InvokeRequest, error) {
 	return InvokeRequestFromJSON2Pb(rc.ReservedContracts)
+}
+
+func (rc *RootConfig) GetForbiddenContract() ([]*pb.InvokeRequest, error) {
+	return InvokeRequestFromJSON2Pb([]InvokeRequest{rc.ForbiddenContract})
 }
 
 // GetReservedWhitelistAccount return reserved whitelist account
@@ -162,4 +195,15 @@ func (gb *GenesisBlock) CalcAward(blockHeight int64) *big.Int {
 	award.SetInt64(N)
 	gb.awardCache.Add(period, award)
 	return award
+}
+
+// GetGasPrice get gas rate for different resource(cpu, mem, disk and xfee)
+func (rc *RootConfig) GetGasPrice() *pb.GasPrice {
+	gasPrice := &pb.GasPrice{
+		CpuRate:  rc.GasPrice.CpuRate,
+		MemRate:  rc.GasPrice.MemRate,
+		DiskRate: rc.GasPrice.DiskRate,
+		XfeeRate: rc.GasPrice.XfeeRate,
+	}
+	return gasPrice
 }

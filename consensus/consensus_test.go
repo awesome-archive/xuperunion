@@ -69,8 +69,7 @@ func plugPrepareWithGensisBlock(t *testing.T) *PluggableConsensus {
 	if err != nil {
 		t.Fatal(err)
 	}
-	utxoVM, _ := utxo.NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
-	tx, gensisErr := utxoVM.GenerateRootTx([]byte(`
+	tx, gensisErr := utxo.GenerateRootTx([]byte(`
         {
             "version" : "1"
             , "consensus" : {
@@ -102,6 +101,7 @@ func plugPrepareWithGensisBlock(t *testing.T) *PluggableConsensus {
 	} else {
 		t.Log("trunk height ", ledger.GetMeta().TrunkHeight)
 	}
+	utxoVM, _ := utxo.NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
 	playErr := utxoVM.Play(block.Blockid)
 	if playErr != nil {
 		t.Fatal(playErr)
@@ -166,7 +166,7 @@ func plugPrepareWithGensisBlock(t *testing.T) *PluggableConsensus {
 			"miner":  "dpzuVdosQrF2kmzumhVeFQZa1aYcdgFpN",
 		},
 	}
-	plugCons, plugErr := NewPluggableConsensus(nil, cfg, bcname, ledger, utxoVM, rootConfig, tCryptoType)
+	plugCons, plugErr := NewPluggableConsensus(nil, cfg, bcname, ledger, utxoVM, rootConfig, tCryptoType, nil)
 	if plugErr != nil {
 		t.Fatal(plugErr)
 	}
@@ -177,6 +177,39 @@ func plugPrepare(t *testing.T) *PluggableConsensus {
 	ldg, err := ledger.NewLedger(workspace, nil, nil, kvengine, tCryptoType)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Generate Root Tx
+	tx, err := utxo.GenerateRootTx([]byte(`
+		{
+		 "version" : "1"
+		 , "consensus" : {
+		 		"miner" : "0x00000000000"
+		 }
+		 , "predistribution":[
+				{
+					"address" : "` + BobAddress + `",
+					"quota" : "100"
+				},
+				{
+					"address" : "` + AliceAddress + `",
+					"quota" : "200"
+				}
+		 ]
+		 , "maxblocksize" : "128"
+		 , "period" : "5000"
+		 , "award" : "1000"
+		 }
+	`))
+	// FormatBlock
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := ldg.FormatRootBlock([]*pb.Transaction{tx})
+	t.Logf("blockid %x", block.Blockid)
+	// ConfirmBlock
+	confirmStatus := ldg.ConfirmBlock(block, true)
+	if !confirmStatus.Succ {
+		t.Fatal("confirm block fail")
 	}
 	utxoVM, _ := utxo.NewUtxoVM("xuper", ldg, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
 	cfg := config.NewNodeConfig()
@@ -191,7 +224,7 @@ func plugPrepare(t *testing.T) *PluggableConsensus {
 			"miner": "dpzuVdosQrF2kmzumhVeFQZa1aYcdgFpN",
 		},
 	}
-	plugCons, err := NewPluggableConsensus(nil, cfg, bcname, ldg, utxoVM, rootConfig, tCryptoType)
+	plugCons, err := NewPluggableConsensus(nil, cfg, bcname, ldg, utxoVM, rootConfig, tCryptoType, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

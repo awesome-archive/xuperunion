@@ -55,6 +55,7 @@ var Users = map[string]struct {
 	},
 }
 
+/*
 func TestUtxoNew(t *testing.T) {
 	workspace, dirErr := ioutil.TempDir("/tmp", "")
 	if dirErr != nil {
@@ -75,6 +76,7 @@ func TestUtxoNew(t *testing.T) {
 		t.Log("query tx[123] error ", err1.Error())
 	}
 }
+*/
 
 func transfer(from string, to string, t *testing.T, utxoVM *UtxoVM, ledger *ledger_pkg.Ledger, amount string, preHash []byte, desc string, frozenHeight int64) ([]byte, error) {
 	t.Logf("preHash of this block: %x", preHash)
@@ -131,6 +133,7 @@ func transfer(from string, to string, t *testing.T, utxoVM *UtxoVM, ledger *ledg
 	}
 
 	// test for asyncMode
+	utxoVM.StartAsyncWriter()
 	utxoVM.asyncMode = true
 	errDo := utxoVM.DoTx(tx)
 	timer.Mark("DoTx")
@@ -191,14 +194,8 @@ func TestUtxoWorkWithLedgerBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(ledger)
-	utxoVM, _ := NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress),
-		nil, false, DefaultKVEngine, crypto_client.CryptoTypeDefault)
-	_, err = utxoVM.QueryTx([]byte("123"))
-	if err != ErrTxNotFound {
-		t.Fatal("unexpected err", err)
-	}
 	//创建链的时候分配财富
-	tx, err := utxoVM.GenerateRootTx([]byte(`
+	tx, err := GenerateRootTx([]byte(`
        {
         "version" : "1"
         , "consensus" : {
@@ -224,19 +221,25 @@ func TestUtxoWorkWithLedgerBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	block, _ := ledger.FormatRootBlock([]*pb.Transaction{tx})
+	t.Logf("blockid %x", block.Blockid)
+	confirmStatus := ledger.ConfirmBlock(block, true)
+	if !confirmStatus.Succ {
+		t.Fatal("confirm block fail")
+	}
+
+	utxoVM, _ := NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress),
+		nil, false, DefaultKVEngine, crypto_client.CryptoTypeDefault)
+	_, err = utxoVM.QueryTx([]byte("123"))
+	if err != ErrTxNotFound {
+		t.Fatal("unexpected err", err)
+	}
 	// test for HasTx
 	exist, _ := utxoVM.HasTx(tx.Txid)
 	t.Log("Has tx ", tx.Txid, exist)
 	err = utxoVM.DoTx(tx)
 	if err != nil {
 		t.Log("coinbase do tx error ", err.Error())
-	}
-
-	block, _ := ledger.FormatRootBlock([]*pb.Transaction{tx})
-	t.Logf("blockid %x", block.Blockid)
-	confirmStatus := ledger.ConfirmBlock(block, true)
-	if !confirmStatus.Succ {
-		t.Fatal("confirm block fail")
 	}
 
 	// test for isConfirmed
@@ -295,8 +298,6 @@ func TestUtxoWorkWithLedgerBasic(t *testing.T) {
 	if lErr != nil {
 		t.Fatal(lErr)
 	}
-	utxoVM2, _ := NewUtxoVM("xuper", ledger2, workspace2, minerPrivateKey, minerPublicKey, []byte(minerAddress),
-		nil, false, DefaultKVEngine, crypto_client.CryptoTypeDefault)
 	pBlockid := ledger.GetMeta().RootBlockid
 	for len(pBlockid) > 0 { //这个for完成把第一个账本的数据同步给第二个
 		t.Logf("replicating... %x", pBlockid)
@@ -311,13 +312,15 @@ func TestUtxoWorkWithLedgerBasic(t *testing.T) {
 		}
 		pBlockid = pBlock.NextHash
 	}
+	utxoVM2, _ := NewUtxoVM("xuper", ledger2, workspace2, minerPrivateKey, minerPublicKey, []byte(minerAddress),
+		nil, false, DefaultKVEngine, crypto_client.CryptoTypeDefault)
 	utxoVM2.Play(ledger2.GetMeta().RootBlockid) //先做一下根节点
 	dummyBlockid, dummyErr := transfer("bob", "alice", t, utxoVM2, ledger2, "7", ledger2.GetMeta().RootBlockid, "", 0)
 	if dummyErr != nil {
 		t.Fatal(dummyErr)
 	}
 	utxoVM2.Play(dummyBlockid)
-	utxoVM2.Walk(ledger2.GetMeta().TipBlockid) //再游走到末端 ,预期会导致dummmy block回滚
+	utxoVM2.Walk(ledger2.GetMeta().TipBlockid, false) //再游走到末端 ,预期会导致dummmy block回滚
 	bobBalance, _ = utxoVM2.GetBalance(BobAddress)
 	aliceBalance, _ = utxoVM2.GetBalance(AliceAddress)
 	minerBalance, _ := utxoVM2.GetBalance("miner-1")
@@ -327,7 +330,7 @@ func TestUtxoWorkWithLedgerBasic(t *testing.T) {
 	}
 	transfer("bob", "alice", t, utxoVM2, ledger2, "7", ledger2.GetMeta().TipBlockid, "", 0)
 	transfer("bob", "alice", t, utxoVM2, ledger2, "7", ledger2.GetMeta().TipBlockid, "", 0)
-	utxoVM2.Walk(ledger2.GetMeta().TipBlockid)
+	utxoVM2.Walk(ledger2.GetMeta().TipBlockid, false)
 	bobBalance, _ = utxoVM2.GetBalance(BobAddress)
 	aliceBalance, _ = utxoVM2.GetBalance(AliceAddress)
 	minerBalance, _ = utxoVM2.GetBalance("miner-1")
@@ -358,12 +361,12 @@ func TestTSort(t *testing.T) {
 	g["tx3"] = []string{"tx1", "tx2"}
 	g["tx2"] = []string{"tx1", "tx0"}
 	g["tx1"] = []string{"tx0"}
-	output, cylic := TopSortDFS(g)
+	output, cylic, _ := TopSortDFS(g)
 	t.Log(output)
 	if !reflect.DeepEqual(output, []string{"tx3", "tx2", "tx1", "tx0"}) {
 		t.Fatal("sort fail")
 	}
-	if cylic != nil {
+	if cylic {
 		t.Fatal("sort fail2")
 	}
 }
@@ -373,12 +376,13 @@ func TestCheckCylic(t *testing.T) {
 	g["tx3"] = []string{"tx1", "tx2"}
 	g["tx2"] = []string{"tx1", "tx0"}
 	g["tx1"] = []string{"tx0", "tx2"}
-	output, cylic := TopSortDFS(g)
+	output, cylic, _ := TopSortDFS(g)
 	if output != nil {
 		t.Fatal("sort fail1")
 	}
 	t.Log(cylic)
-	if len(cylic) != 2 {
+	//if len(cylic) != 2 {
+	if cylic == false {
 		t.Fatal("sort fail2")
 	}
 }
@@ -395,10 +399,8 @@ func TestFrozenHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(ledger)
-	utxoVM, _ := NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress),
-		nil, false, DefaultKVEngine, crypto_client.CryptoTypeDefault)
 	//创建链的时候分配, bob:100, alice:200
-	tx, err := utxoVM.GenerateRootTx([]byte(`
+	tx, err := GenerateRootTx([]byte(`
        {
         "version" : "1"
         , "consensus" : {
@@ -429,6 +431,8 @@ func TestFrozenHeight(t *testing.T) {
 	if !confirmStatus.Succ {
 		t.Fatal("confirm block fail")
 	}
+	utxoVM, _ := NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress),
+		nil, false, DefaultKVEngine, crypto_client.CryptoTypeDefault)
 	playErr := utxoVM.Play(block.Blockid)
 	if playErr != nil {
 		t.Fatal(playErr)
@@ -445,7 +449,6 @@ func TestFrozenHeight(t *testing.T) {
 	} else {
 		t.Logf("next block id: %x", nextBlockid)
 	}
-
 	// test for GetFrozenBalance
 	frozenBalance, frozenBalanceErr := utxoVM.GetFrozenBalance(AliceAddress)
 	if frozenBalanceErr != nil {
@@ -453,7 +456,6 @@ func TestFrozenHeight(t *testing.T) {
 	} else {
 		t.Log("alice frozen balance ", frozenBalance)
 	}
-
 	//alice给bob转300, 预期失败，因为无法使用被冻住的utxo
 	nextBlockid, blockErr = transfer("alice", "bob", t, utxoVM, ledger, "300", ledger.GetMeta().TipBlockid, "", 0)
 	if blockErr != ErrNoEnoughUTXO {

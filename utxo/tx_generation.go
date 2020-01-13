@@ -72,7 +72,8 @@ func (uv *UtxoVM) GenerateTx(txReq *pb.TxData) (*pb.Transaction, error) {
 		uv.xlog.Warn("failed to GetTxSerializedSize", "err", err)
 		return nil, err
 	}
-	if txSize > uv.ledger.GetMaxBlockSize() {
+	maxBlockSize := uv.GetMaxBlockSize()
+	if txSize > maxBlockSize {
 		uv.xlog.Warn("tx size limit exceeded", "txSize", txSize)
 		return nil, ErrTxSizeLimitExceeded
 	}

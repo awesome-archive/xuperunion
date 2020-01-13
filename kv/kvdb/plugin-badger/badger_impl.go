@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dgraph-io/badger"
-	"github.com/xuperchain/log15"
+	log "github.com/xuperchain/log15"
+
+	"github.com/dgraph-io/badger/v2"
 	"github.com/xuperchain/xuperunion/kv/kvdb"
 )
 
@@ -59,7 +60,7 @@ func (bdb *BadgerDatabase) Close() {
 func (bdb *BadgerDatabase) Put(key []byte, value []byte) error {
 	wb := bdb.db.NewWriteBatch()
 	defer wb.Cancel()
-	err := wb.Set(key, value, 0)
+	err := wb.SetEntry(badger.NewEntry(key, value).WithMeta(0))
 	if err != nil {
 		return err
 	}
@@ -96,6 +97,10 @@ func (bdb *BadgerDatabase) Has(key []byte) (bool, error) {
 		}
 		return err
 	})
+	// align with leveldb, if the key doesn't exist, leveldb returns nil
+	if kvdb.ErrNotFound(err) {
+		err = nil
+	}
 	return exist, err
 }
 
@@ -116,7 +121,7 @@ func (b *BadgerBatch) Put(key, value []byte) error {
 		b.b = b.db.NewWriteBatch()
 		b.discard = false
 	}
-	err := b.b.Set(key, value, 0)
+	err := b.b.SetEntry(badger.NewEntry(key, value).WithMeta(0))
 	if err != nil {
 		return err
 	}
@@ -143,7 +148,7 @@ func (b *BadgerBatch) PutIfAbsent(key, value []byte) error {
 		b.discard = false
 	}
 	if !b.keys[string(key)] {
-		err := b.b.Set(key, value, 0)
+		err := b.b.SetEntry(badger.NewEntry(key, value).WithMeta(0))
 		if err != nil {
 			return err
 		}

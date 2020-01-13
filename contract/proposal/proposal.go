@@ -56,7 +56,7 @@ func (prp *Proposal) Run(desc *contract.TxDesc) error {
 	case proposeMethod:
 		return prp.runPropose(desc)
 	case voteMethod:
-		return prp.runVote(desc)
+		return prp.runVote(desc, prp.context.Block)
 	case createTriggerMethod:
 		return prp.saveTrigger(desc.Tx.Txid, desc.Trigger)
 	case thawMethod:
@@ -201,7 +201,7 @@ func (prp *Proposal) IsPropose(proposalTx *pb.Transaction) bool {
 	return proposalDesc.Method == proposeMethod
 }
 
-func (prp *Proposal) runVote(desc *contract.TxDesc) error {
+func (prp *Proposal) runVote(desc *contract.TxDesc, block *pb.InternalBlock) error {
 	prp.log.Debug("start run vote")
 	proposalTxid, err := prp.getTxidFromArgs(desc)
 	if err != nil {
@@ -220,7 +220,8 @@ func (prp *Proposal) runVote(desc *contract.TxDesc) error {
 		return err
 	}
 	stopVoteHeight := int64(argValue)
-	ledgerHeight := prp.ledger.GetMeta().TrunkHeight
+	//ledgerHeight := prp.ledger.GetMeta().TrunkHeight
+	ledgerHeight := block.Height
 	if ledgerHeight > stopVoteHeight {
 		prp.log.Warn(fmt.Sprintf("this propposal is expired for voting, %d > %d", ledgerHeight, stopVoteHeight))
 		return nil
@@ -283,7 +284,7 @@ func (prp *Proposal) IsVoteOk(proposalTx *pb.Transaction) bool {
 	prp.log.Debug("vote result", "need", voteNeeded, "got", curVoteAmount)
 	voteOK := curVoteAmount.Cmp(voteNeeded) >= 0
 	if !voteOK {
-		prp.log.Warn("no enough vote collected", "txid", proposalTx.HexTxid())
+		prp.log.Warn("no enough vote collected", "txid", proposalTx.HexTxid(), "needed", voteNeeded.String(), "currgot", curVoteAmount.String())
 	}
 	return voteOK
 }
@@ -300,7 +301,54 @@ func (prp *Proposal) fillOldState(desc []byte) ([]byte, error) {
 	switch contractKey {
 	case "kernel.UpdateMaxBlockSize":
 		prp.log.Trace("contract desc need to process", "contractKey", "kernel.UpdateMaxBlockSize")
-		descObj.Args["old_block_size"] = prp.ledger.GetMaxBlockSize()
+		oldMaxBlockSize := prp.utxoVM.GetMaxBlockSize()
+		descObj.Args["old_block_size"] = oldMaxBlockSize
+	case "kernel.UpdateNewAccountResourceAmount":
+		prp.log.Trace("contract desc need to process", "contractKey", "kernel.UpdateNewAccountResourceAmount")
+		descObj.Args["old_new_account_resource_amount"] = prp.utxoVM.GetNewAccountResourceAmount()
+	case "kernel.UpdateIrreversibleSlideWindow":
+		prp.log.Trace("contract desc need to process", "contractKey", "kernel.UpdateIrreversibleSlideWindow")
+		descObj.Args["old_irreversible_slide_window"] = prp.utxoVM.GetIrreversibleSlideWindow()
+	case "kernel.UpdateReservedContract":
+		prp.log.Trace("contract desc need to process", "contractKey", "kernel.UpdateReservedContract")
+		reservedContracts := []ledger.InvokeRequest{}
+		metaReservedContracts := prp.utxoVM.GetReservedContracts()
+		for _, rc := range metaReservedContracts {
+			args := map[string]string{}
+			for k, v := range rc.GetArgs() {
+				args[k] = string(v)
+			}
+			param := ledger.InvokeRequest{
+				ModuleName:   rc.GetModuleName(),
+				ContractName: rc.GetContractName(),
+				MethodName:   rc.GetMethodName(),
+				Args:         args,
+			}
+			reservedContracts = append(reservedContracts, param)
+		}
+		descObj.Args["old_reserved_contracts"] = reservedContracts
+	case "kernel.UpdateForbiddenContract":
+		prp.log.Trace("contract desc need to process", "contractKey", "kernel.UpdateForbiddenContract")
+		forbiddenContract := prp.utxoVM.GetForbiddenContract()
+
+		forbiddenContractMap := map[string]interface{}{}
+		forbiddenContractMap["module_name"] = forbiddenContract.GetModuleName()
+		forbiddenContractMap["contract_name"] = forbiddenContract.GetContractName()
+		forbiddenContractMap["method_name"] = forbiddenContract.GetMethodName()
+		forbiddenContractMap["args"] = forbiddenContract.GetArgs()
+
+		descObj.Args["old_forbidden_contract"] = forbiddenContractMap
+	case "kernel.UpdateGasPrice":
+		prp.log.Trace("contract desc need to process", "contractKey", "kernel.UpdateGasPrice")
+		gasPrice := prp.utxoVM.GetGasPrice()
+
+		gasPriceMap := map[string]interface{}{}
+		gasPriceMap["cpu_rate"] = gasPrice.GetCpuRate()
+		gasPriceMap["mem_rate"] = gasPrice.GetMemRate()
+		gasPriceMap["disk_rate"] = gasPrice.GetDiskRate()
+		gasPriceMap["xfee_rate"] = gasPrice.GetXfeeRate()
+
+		descObj.Args["old_gas_price"] = gasPrice
 	default:
 		prp.log.Trace("contract desc do not need to process")
 	}
@@ -346,7 +394,7 @@ func (prp *Proposal) GetVerifiableAutogenTx(blockHeight int64, maxCount int, tim
 		if err != nil {
 			prp.log.Warn("failed to generate triggered tx", "err", err)
 		}
-		prp.log.Debug("tirgger new tx", "txid", tx.HexTxid(), "desc", string(desc), "tx", tx)
+		prp.log.Debug("tirgger new tx", "txid", tx.HexTxid(), "desc", string(desc), "tx", tx, "tx.desc", string(tx.Desc))
 		triggeredTxList = append(triggeredTxList, tx)
 	}
 	if it.Error() != nil {

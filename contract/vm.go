@@ -5,7 +5,17 @@ import (
 	"sync"
 
 	log "github.com/xuperchain/log15"
+	"github.com/xuperchain/xuperunion/pb"
 	"github.com/xuperchain/xuperunion/xmodel"
+)
+
+const (
+	// StatusOK is used when contract successfully ends.
+	StatusOK = 200
+	// StatusErrorThreshold is the status dividing line for the normal operation of the contract
+	StatusErrorThreshold = 400
+	// StatusError is used when contract fails.
+	StatusError = 500
 )
 
 var (
@@ -13,13 +23,54 @@ var (
 	ErrVMNotExist = errors.New("Vm not exist in vm manager")
 )
 
+// Response is the result of the contract run
+type Response struct {
+	// Status 用于反映合约的运行结果的错误码
+	Status int `json:"status"`
+	// Message 用于携带一些有用的debug信息
+	Message string `json:"message"`
+	// Data 字段用于存储合约执行的结果
+	Body []byte `json:"body"`
+}
+
+func ToPBContractResponse(resp *Response) *pb.ContractResponse {
+	return &pb.ContractResponse{
+		Status:  int32(resp.Status),
+		Message: resp.Message,
+		Body:    resp.Body,
+	}
+}
+
+// ChainCore is the interface of chain service
+type ChainCore interface {
+	GetAccountAddresses(accountName string) ([]string, error)
+	VerifyContractPermission(initiator string, authRequire []string, contractName, methodName string) (bool, error)
+}
+
 // ContextConfig define the config of context
 type ContextConfig struct {
-	XMCache        *xmodel.XMCache
-	Initiator      string
-	AuthRequire    []string
-	ContractName   string
-	ResourceLimits Limits
+	XMCache     *xmodel.XMCache
+	Initiator   string
+	AuthRequire []string
+	// NewAccountResourceAmount the amount of creating a contract account
+	NewAccountResourceAmount int64
+	ContractName             string
+	ResourceLimits           Limits
+	// Whether contract can be initialized
+	CanInitialize bool
+
+	// The chain service
+	Core ChainCore
+
+	// The amount transfer to contract
+	TransferAmount string
+
+	// Chain name
+	BCName string
+
+	// Contract being called
+	// set by bridge to check recursive contract call
+	ContractSet map[string]bool
 }
 
 // VirtualMachine define virtual machine interface
@@ -30,7 +81,7 @@ type VirtualMachine interface {
 
 // Context define context interface
 type Context interface {
-	Invoke(method string, args map[string][]byte) ([]byte, error)
+	Invoke(method string, args map[string][]byte) (*Response, error)
 	ResourceUsed() Limits
 	Release() error
 }

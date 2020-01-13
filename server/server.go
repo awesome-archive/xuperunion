@@ -14,6 +14,8 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
+	"strconv"
 
 	"github.com/golang/protobuf/proto"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -49,13 +51,16 @@ func (s *server) PostTx(ctx context.Context, in *pb.TxStatus) (*pb.CommonReply, 
 
 	out, needRepost, err := s.mg.ProcessTx(in)
 	if needRepost {
-		msgInfo, _ := proto.Marshal(in)
-		msg, _ := xuper_p2p.NewXuperMessage(xuper_p2p.XuperMsgVersion1, in.GetBcname(), in.GetHeader().GetLogid(), xuper_p2p.XuperMessage_POSTTX, msgInfo, xuper_p2p.XuperMessage_NONE)
-		opts := []p2pv2.MessageOption{
-			p2pv2.WithFilters([]p2pv2.FilterStrategy{p2pv2.DefaultStrategy}),
-			p2pv2.WithBcName(in.GetBcname()),
-		}
-		go s.mg.P2pv2.SendMessage(context.Background(), msg, opts...)
+		go func() {
+			msgInfo, _ := proto.Marshal(in)
+			msg, _ := xuper_p2p.NewXuperMessage(xuper_p2p.XuperMsgVersion1, in.GetBcname(), in.GetHeader().GetLogid(), xuper_p2p.XuperMessage_POSTTX, msgInfo, xuper_p2p.XuperMessage_NONE)
+			opts := []p2pv2.MessageOption{
+				p2pv2.WithFilters([]p2pv2.FilterStrategy{p2pv2.DefaultStrategy}),
+				p2pv2.WithBcName(in.GetBcname()),
+				p2pv2.WithCompress(s.mg.GetXchainmgConfig().EnableCompress),
+			}
+			s.mg.P2pv2.SendMessage(context.Background(), msg, opts...)
+		}()
 	}
 	return out, err
 }
@@ -92,6 +97,33 @@ func (s *server) BatchPostTx(ctx context.Context, in *pb.BatchTxs) (*pb.CommonRe
 		}
 		go s.mg.P2pv2.SendMessage(context.Background(), msg, opts...)
 	}
+	return out, nil
+}
+
+// QueryUtxoRecord query utxo records
+func (s *server) QueryUtxoRecord(ctx context.Context, in *pb.UtxoRecordDetail) (*pb.UtxoRecordDetail, error) {
+	s.mg.Speed.Add("QueryUtxoRecord")
+	if in.GetHeader() == nil {
+		in.Header = global.GHeader()
+	}
+	out := &pb.UtxoRecordDetail{Header: &pb.Header{}}
+	bc := s.mg.Get(in.GetBcname())
+
+	if bc == nil {
+		out.Header.Error = pb.XChainErrorEnum_CONNECT_REFUSE
+		s.log.Trace("refuse a connection at function call QueryUtxoRecord", "logid", in.Header.Logid)
+		return out, nil
+	}
+
+	accountName := in.GetAccountName()
+	if len(accountName) > 0 {
+		utxoRecord, err := bc.QueryUtxoRecord(accountName, in.GetDisplayCount())
+		if err != nil {
+			return out, err
+		}
+		return utxoRecord, nil
+	}
+
 	return out, nil
 }
 
@@ -227,6 +259,32 @@ func (s *server) GetFrozenBalance(ctx context.Context, in *pb.AddressStatus) (*p
 	return in, nil
 }
 
+// GetFrozenBalance get balance frozened for account or addr
+func (s *server) GetBalanceDetail(ctx context.Context, in *pb.AddressBalanceStatus) (*pb.AddressBalanceStatus, error) {
+	s.mg.Speed.Add("GetFrozenBalance")
+	if in.Header == nil {
+		in.Header = global.GHeader()
+	}
+	for i := 0; i < len(in.Tfds); i++ {
+		bc := s.mg.Get(in.Tfds[i].Bcname)
+		if bc == nil {
+			in.Tfds[i].Error = pb.XChainErrorEnum_BLOCKCHAIN_NOTEXIST
+			in.Tfds[i].Tfd = nil
+		} else {
+			tfd, err := bc.GetBalanceDetail(in.Address)
+			if err != nil {
+				in.Tfds[i].Error = HandleBlockCoreError(err)
+				in.Tfds[i].Tfd = nil
+			} else {
+				in.Tfds[i].Error = pb.XChainErrorEnum_SUCCESS
+				//				in.Bcs[i].Balance = bi
+				in.Tfds[i] = tfd
+			}
+		}
+	}
+	return in, nil
+}
+
 // GetBlock get block info according to blockID
 func (s *server) GetBlock(ctx context.Context, in *pb.BlockID) (*pb.Block, error) {
 	s.mg.Speed.Add("GetBlock")
@@ -344,7 +402,45 @@ func (s *server) GetNetURL(ctx context.Context, in *pb.CommonIn) (*pb.RawUrl, er
 	return out, nil
 }
 
-// SelectUTXO select utxo inputs
+// SelectUTXOBySize select utxo inputs depending on size
+func (s *server) SelectUTXOBySize(ctx context.Context, in *pb.UtxoInput) (*pb.UtxoOutput, error) {
+	if in.GetHeader() == nil {
+		in.Header = global.GHeader()
+	}
+	out := &pb.UtxoOutput{Header: &pb.Header{Logid: in.Header.Logid}}
+	bc := s.mg.Get(in.GetBcname())
+	if bc == nil {
+		out.Header.Error = pb.XChainErrorEnum_CONNECT_REFUSE
+		s.log.Warn("failed to merge utxo, bcname not exists", "logid", in.Header.Logid)
+		return out, nil
+	}
+	out.Header.Error = pb.XChainErrorEnum_SUCCESS
+	utxos, _, totalSelected, err := bc.Utxovm.SelectUtxosBySize(in.GetAddress(), in.GetPublickey(), in.GetNeedLock(), false)
+	if err != nil {
+		out.Header.Error = xchaincore.HandlerUtxoError(err)
+		s.log.Warn("failed to select utxo", "logid", in.Header.Logid, "error", err.Error())
+		return out, nil
+	}
+	utxoList := []*pb.Utxo{}
+	for _, v := range utxos {
+		utxo := &pb.Utxo{
+			RefTxid:   v.RefTxid,
+			RefOffset: v.RefOffset,
+			ToAddr:    v.FromAddr,
+			Amount:    v.Amount,
+		}
+		utxoList = append(utxoList, utxo)
+		s.log.Trace("Merge utxo list", "refTxid", fmt.Sprintf("%x", v.RefTxid), "refOffset", v.RefOffset, "amount", new(big.Int).SetBytes(v.Amount).String())
+	}
+	totalSelectedStr := totalSelected.String()
+	s.log.Trace("Merge utxo totalSelect", "totalSelect", totalSelectedStr)
+	out.UtxoList = utxoList
+	out.TotalSelected = totalSelectedStr
+
+	return out, nil
+}
+
+// SelectUTXO select utxo inputs depending on amount
 func (s *server) SelectUTXO(ctx context.Context, in *pb.UtxoInput) (*pb.UtxoOutput, error) {
 	if in.Header == nil {
 		in.Header = global.GHeader()
@@ -391,6 +487,10 @@ func (s *server) DeployNativeCode(ctx context.Context, request *pb.DeployNativeC
 	if request.Header == nil {
 		request.Header = global.GHeader()
 	}
+	if !s.mg.Cfg.Native.Enable {
+		return nil, errors.New("native module is disabled")
+	}
+
 	cfg := s.mg.Cfg.Native.Deploy
 	if cfg.WhiteList.Enable {
 		found := false
@@ -446,6 +546,10 @@ func (s *server) DeployNativeCode(ctx context.Context, request *pb.DeployNativeC
 
 // NativeCodeStatus get native contract status
 func (s *server) NativeCodeStatus(ctx context.Context, request *pb.NativeCodeStatusRequest) (*pb.NativeCodeStatusResponse, error) {
+	if !s.mg.Cfg.Native.Enable {
+		return nil, errors.New("native module is disabled")
+	}
+
 	bc := s.mg.Get(request.GetBcname())
 	if request.Header == nil {
 		request.Header = global.GHeader()
@@ -675,6 +779,60 @@ func (s *server) DposStatus(ctx context.Context, request *pb.DposStatusRequest) 
 	return response, nil
 }
 
+// PreExecWithSelectUTXO preExec + selectUtxo
+func (s *server) PreExecWithSelectUTXO(ctx context.Context, request *pb.PreExecWithSelectUTXORequest) (*pb.PreExecWithSelectUTXOResponse, error) {
+	// verify input param
+	if request == nil {
+		return nil, errors.New("request is invalid")
+	}
+	if request.Header == nil {
+		request.Header = global.GHeader()
+	}
+
+	// initialize output
+	responses := &pb.PreExecWithSelectUTXOResponse{Header: &pb.Header{Logid: request.Header.Logid}}
+	responses.Bcname = request.GetBcname()
+	// for PreExec
+	preExecRequest := request.GetRequest()
+	fee := int64(0)
+	if preExecRequest != nil {
+		preExecRequest.Header = request.Header
+		invokeRPCResponse, preErr := s.PreExec(ctx, preExecRequest)
+		if preErr != nil {
+			return nil, preErr
+		}
+		invokeResponse := invokeRPCResponse.GetResponse()
+		responses.Response = invokeResponse
+		fee = responses.Response.GetGasUsed()
+	}
+
+	totalAmount := request.GetTotalAmount() + fee
+
+	if totalAmount > 0 {
+		utxoInput := &pb.UtxoInput{
+			Bcname:    request.GetBcname(),
+			Address:   request.GetAddress(),
+			TotalNeed: strconv.FormatInt(totalAmount, 10),
+			Publickey: request.GetSignInfo().GetPublicKey(),
+			UserSign:  request.GetSignInfo().GetSign(),
+			NeedLock:  request.GetNeedLock(),
+		}
+		if ok := validUtxoAccess(utxoInput, s.mg.Get(utxoInput.GetBcname()), request.GetTotalAmount()); !ok {
+			return nil, errors.New("validUtxoAccess failed")
+		}
+		utxoOutput, selectErr := s.SelectUTXO(ctx, utxoInput)
+		if selectErr != nil {
+			return nil, selectErr
+		}
+		if utxoOutput.Header.Error != pb.XChainErrorEnum_SUCCESS {
+			return nil, common.ServerError{utxoOutput.Header.Error}
+		}
+		responses.UtxoOutput = utxoOutput
+	}
+
+	return responses, nil
+}
+
 // PreExec smart contract preExec process
 func (s *server) PreExec(ctx context.Context, request *pb.InvokeRPCRequest) (*pb.InvokeRPCResponse, error) {
 	s.log.Trace("Got PreExec req", "req", request)
@@ -832,6 +990,10 @@ func startTCPServer(xchainmg *xchaincore.XChainMG) error {
 	log.Trace("start rpc server")
 	s := grpc.NewServer(rpcOptions...)
 	pb.RegisterXchainServer(s, &svr)
+	if cfg.EnableXEndorser {
+		endorser := NewDefaultXEndorser(&svr)
+		pb.RegisterXendorserServer(s, endorser)
+	}
 	if cfg.TCPServer.MetricPort != "" {
 		grpc_prometheus.EnableHandlingTimeHistogram(
 			grpc_prometheus.WithHistogramBuckets([]float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}),

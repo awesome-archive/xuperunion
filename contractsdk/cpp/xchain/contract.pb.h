@@ -40,7 +40,7 @@ struct TableStruct_contract_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::google::protobuf::internal::AuxillaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::google::protobuf::internal::ParseTable schema[32]
+  static const ::google::protobuf::internal::ParseTable schema[34]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::google::protobuf::internal::FieldMetadata field_metadata[];
   static const ::google::protobuf::internal::SerializationTable serialization_table[];
@@ -70,6 +70,12 @@ extern DeleteRequestDefaultTypeInternal _DeleteRequest_default_instance_;
 class DeleteResponse;
 class DeleteResponseDefaultTypeInternal;
 extern DeleteResponseDefaultTypeInternal _DeleteResponse_default_instance_;
+class GetAccountAddressesRequest;
+class GetAccountAddressesRequestDefaultTypeInternal;
+extern GetAccountAddressesRequestDefaultTypeInternal _GetAccountAddressesRequest_default_instance_;
+class GetAccountAddressesResponse;
+class GetAccountAddressesResponseDefaultTypeInternal;
+extern GetAccountAddressesResponseDefaultTypeInternal _GetAccountAddressesResponse_default_instance_;
 class GetCallArgsRequest;
 class GetCallArgsRequestDefaultTypeInternal;
 extern GetCallArgsRequestDefaultTypeInternal _GetCallArgsRequest_default_instance_;
@@ -157,6 +163,8 @@ template<> ::xchain::contract::sdk::ContractCallRequest* Arena::CreateMaybeMessa
 template<> ::xchain::contract::sdk::ContractCallResponse* Arena::CreateMaybeMessage<::xchain::contract::sdk::ContractCallResponse>(Arena*);
 template<> ::xchain::contract::sdk::DeleteRequest* Arena::CreateMaybeMessage<::xchain::contract::sdk::DeleteRequest>(Arena*);
 template<> ::xchain::contract::sdk::DeleteResponse* Arena::CreateMaybeMessage<::xchain::contract::sdk::DeleteResponse>(Arena*);
+template<> ::xchain::contract::sdk::GetAccountAddressesRequest* Arena::CreateMaybeMessage<::xchain::contract::sdk::GetAccountAddressesRequest>(Arena*);
+template<> ::xchain::contract::sdk::GetAccountAddressesResponse* Arena::CreateMaybeMessage<::xchain::contract::sdk::GetAccountAddressesResponse>(Arena*);
 template<> ::xchain::contract::sdk::GetCallArgsRequest* Arena::CreateMaybeMessage<::xchain::contract::sdk::GetCallArgsRequest>(Arena*);
 template<> ::xchain::contract::sdk::GetRequest* Arena::CreateMaybeMessage<::xchain::contract::sdk::GetRequest>(Arena*);
 template<> ::xchain::contract::sdk::GetResponse* Arena::CreateMaybeMessage<::xchain::contract::sdk::GetResponse>(Arena*);
@@ -885,6 +893,20 @@ class CallArgs :
   ::std::string* release_initiator();
   void set_allocated_initiator(::std::string* initiator);
 
+  // string transfer_amount = 5;
+  void clear_transfer_amount();
+  static const int kTransferAmountFieldNumber = 5;
+  const ::std::string& transfer_amount() const;
+  void set_transfer_amount(const ::std::string& value);
+  #if LANG_CXX11
+  void set_transfer_amount(::std::string&& value);
+  #endif
+  void set_transfer_amount(const char* value);
+  void set_transfer_amount(const char* value, size_t size);
+  ::std::string* mutable_transfer_amount();
+  ::std::string* release_transfer_amount();
+  void set_allocated_transfer_amount(::std::string* transfer_amount);
+
   // @@protoc_insertion_point(class_scope:xchain.contract.sdk.CallArgs)
  private:
   class HasBitSetters;
@@ -894,6 +916,7 @@ class CallArgs :
   ::google::protobuf::RepeatedPtrField<::std::string> auth_require_;
   ::google::protobuf::internal::ArenaStringPtr method_;
   ::google::protobuf::internal::ArenaStringPtr initiator_;
+  ::google::protobuf::internal::ArenaStringPtr transfer_amount_;
   mutable ::google::protobuf::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_contract_2eproto;
 };
@@ -2676,9 +2699,23 @@ class TransferRequest :
 
   // accessors -------------------------------------------------------
 
-  // string to = 2;
+  // string from = 2;
+  void clear_from();
+  static const int kFromFieldNumber = 2;
+  const ::std::string& from() const;
+  void set_from(const ::std::string& value);
+  #if LANG_CXX11
+  void set_from(::std::string&& value);
+  #endif
+  void set_from(const char* value);
+  void set_from(const char* value, size_t size);
+  ::std::string* mutable_from();
+  ::std::string* release_from();
+  void set_allocated_from(::std::string* from);
+
+  // string to = 3;
   void clear_to();
-  static const int kToFieldNumber = 2;
+  static const int kToFieldNumber = 3;
   const ::std::string& to() const;
   void set_to(const ::std::string& value);
   #if LANG_CXX11
@@ -2690,9 +2727,9 @@ class TransferRequest :
   ::std::string* release_to();
   void set_allocated_to(::std::string* to);
 
-  // string amount = 3;
+  // string amount = 4;
   void clear_amount();
-  static const int kAmountFieldNumber = 3;
+  static const int kAmountFieldNumber = 4;
   const ::std::string& amount() const;
   void set_amount(const ::std::string& value);
   #if LANG_CXX11
@@ -2718,6 +2755,7 @@ class TransferRequest :
   class HasBitSetters;
 
   ::google::protobuf::internal::InternalMetadataWithArenaLite _internal_metadata_;
+  ::google::protobuf::internal::ArenaStringPtr from_;
   ::google::protobuf::internal::ArenaStringPtr to_;
   ::google::protobuf::internal::ArenaStringPtr amount_;
   ::xchain::contract::sdk::SyscallHeader* header_;
@@ -3669,7 +3707,7 @@ class TxInput :
 
   // accessors -------------------------------------------------------
 
-  // bytes ref_txid = 1;
+  // string ref_txid = 1;
   void clear_ref_txid();
   static const int kRefTxidFieldNumber = 1;
   const ::std::string& ref_txid() const;
@@ -3678,7 +3716,7 @@ class TxInput :
   void set_ref_txid(::std::string&& value);
   #endif
   void set_ref_txid(const char* value);
-  void set_ref_txid(const void* value, size_t size);
+  void set_ref_txid(const char* value, size_t size);
   ::std::string* mutable_ref_txid();
   ::std::string* release_ref_txid();
   void set_allocated_ref_txid(::std::string* ref_txid);
@@ -3697,7 +3735,7 @@ class TxInput :
   ::std::string* release_from_addr();
   void set_allocated_from_addr(::std::string* from_addr);
 
-  // bytes amount = 6;
+  // string amount = 6;
   void clear_amount();
   static const int kAmountFieldNumber = 6;
   const ::std::string& amount() const;
@@ -3706,7 +3744,7 @@ class TxInput :
   void set_amount(::std::string&& value);
   #endif
   void set_amount(const char* value);
-  void set_amount(const void* value, size_t size);
+  void set_amount(const char* value, size_t size);
   ::std::string* mutable_amount();
   ::std::string* release_amount();
   void set_allocated_amount(::std::string* amount);
@@ -3829,7 +3867,7 @@ class TxOutput :
 
   // accessors -------------------------------------------------------
 
-  // bytes amount = 1;
+  // string amount = 1;
   void clear_amount();
   static const int kAmountFieldNumber = 1;
   const ::std::string& amount() const;
@@ -3838,7 +3876,7 @@ class TxOutput :
   void set_amount(::std::string&& value);
   #endif
   void set_amount(const char* value);
-  void set_amount(const void* value, size_t size);
+  void set_amount(const char* value, size_t size);
   ::std::string* mutable_amount();
   ::std::string* release_amount();
   void set_allocated_amount(::std::string* amount);
@@ -4213,7 +4251,7 @@ class Block :
   ::std::string* release_blockid();
   void set_allocated_blockid(::std::string* blockid);
 
-  // bytes pre_hash = 4;
+  // string pre_hash = 4;
   void clear_pre_hash();
   static const int kPreHashFieldNumber = 4;
   const ::std::string& pre_hash() const;
@@ -4222,7 +4260,7 @@ class Block :
   void set_pre_hash(::std::string&& value);
   #endif
   void set_pre_hash(const char* value);
-  void set_pre_hash(const void* value, size_t size);
+  void set_pre_hash(const char* value, size_t size);
   ::std::string* mutable_pre_hash();
   ::std::string* release_pre_hash();
   void set_allocated_pre_hash(::std::string* pre_hash);
@@ -4241,7 +4279,7 @@ class Block :
   ::std::string* release_proposer();
   void set_allocated_proposer(::std::string* proposer);
 
-  // bytes sign = 6;
+  // string sign = 6;
   void clear_sign();
   static const int kSignFieldNumber = 6;
   const ::std::string& sign() const;
@@ -4250,7 +4288,7 @@ class Block :
   void set_sign(::std::string&& value);
   #endif
   void set_sign(const char* value);
-  void set_sign(const void* value, size_t size);
+  void set_sign(const char* value, size_t size);
   ::std::string* mutable_sign();
   ::std::string* release_sign();
   void set_allocated_sign(::std::string* sign);
@@ -4269,7 +4307,7 @@ class Block :
   ::std::string* release_pubkey();
   void set_allocated_pubkey(::std::string* pubkey);
 
-  // bytes next_hash = 15;
+  // string next_hash = 15;
   void clear_next_hash();
   static const int kNextHashFieldNumber = 15;
   const ::std::string& next_hash() const;
@@ -4278,7 +4316,7 @@ class Block :
   void set_next_hash(::std::string&& value);
   #endif
   void set_next_hash(const char* value);
-  void set_next_hash(const void* value, size_t size);
+  void set_next_hash(const char* value, size_t size);
   ::std::string* mutable_next_hash();
   ::std::string* release_next_hash();
   void set_allocated_next_hash(::std::string* next_hash);
@@ -4316,6 +4354,256 @@ class Block :
   ::google::protobuf::int64 height_;
   ::google::protobuf::int32 tx_count_;
   bool in_trunk_;
+  mutable ::google::protobuf::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_contract_2eproto;
+};
+// -------------------------------------------------------------------
+
+class GetAccountAddressesRequest :
+    public ::google::protobuf::MessageLite /* @@protoc_insertion_point(class_definition:xchain.contract.sdk.GetAccountAddressesRequest) */ {
+ public:
+  GetAccountAddressesRequest();
+  virtual ~GetAccountAddressesRequest();
+
+  GetAccountAddressesRequest(const GetAccountAddressesRequest& from);
+
+  inline GetAccountAddressesRequest& operator=(const GetAccountAddressesRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  #if LANG_CXX11
+  GetAccountAddressesRequest(GetAccountAddressesRequest&& from) noexcept
+    : GetAccountAddressesRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline GetAccountAddressesRequest& operator=(GetAccountAddressesRequest&& from) noexcept {
+    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
+      if (this != &from) InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+  #endif
+  static const GetAccountAddressesRequest& default_instance();
+
+  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
+  static inline const GetAccountAddressesRequest* internal_default_instance() {
+    return reinterpret_cast<const GetAccountAddressesRequest*>(
+               &_GetAccountAddressesRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    32;
+
+  void Swap(GetAccountAddressesRequest* other);
+  friend void swap(GetAccountAddressesRequest& a, GetAccountAddressesRequest& b) {
+    a.Swap(&b);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline GetAccountAddressesRequest* New() const final {
+    return CreateMaybeMessage<GetAccountAddressesRequest>(nullptr);
+  }
+
+  GetAccountAddressesRequest* New(::google::protobuf::Arena* arena) const final {
+    return CreateMaybeMessage<GetAccountAddressesRequest>(arena);
+  }
+  void CheckTypeAndMergeFrom(const ::google::protobuf::MessageLite& from)
+    final;
+  void CopyFrom(const GetAccountAddressesRequest& from);
+  void MergeFrom(const GetAccountAddressesRequest& from);
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  #if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
+  static const char* _InternalParse(const char* begin, const char* end, void* object, ::google::protobuf::internal::ParseContext* ctx);
+  ::google::protobuf::internal::ParseFunc _ParseFunc() const final { return _InternalParse; }
+  #else
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input) final;
+  #endif  // GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const final;
+  void DiscardUnknownFields();
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  void InternalSwap(GetAccountAddressesRequest* other);
+  private:
+  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
+    return nullptr;
+  }
+  inline void* MaybeArenaPtr() const {
+    return nullptr;
+  }
+  public:
+
+  ::std::string GetTypeName() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // string account = 2;
+  void clear_account();
+  static const int kAccountFieldNumber = 2;
+  const ::std::string& account() const;
+  void set_account(const ::std::string& value);
+  #if LANG_CXX11
+  void set_account(::std::string&& value);
+  #endif
+  void set_account(const char* value);
+  void set_account(const char* value, size_t size);
+  ::std::string* mutable_account();
+  ::std::string* release_account();
+  void set_allocated_account(::std::string* account);
+
+  // .xchain.contract.sdk.SyscallHeader header = 1;
+  bool has_header() const;
+  void clear_header();
+  static const int kHeaderFieldNumber = 1;
+  const ::xchain::contract::sdk::SyscallHeader& header() const;
+  ::xchain::contract::sdk::SyscallHeader* release_header();
+  ::xchain::contract::sdk::SyscallHeader* mutable_header();
+  void set_allocated_header(::xchain::contract::sdk::SyscallHeader* header);
+
+  // @@protoc_insertion_point(class_scope:xchain.contract.sdk.GetAccountAddressesRequest)
+ private:
+  class HasBitSetters;
+
+  ::google::protobuf::internal::InternalMetadataWithArenaLite _internal_metadata_;
+  ::google::protobuf::internal::ArenaStringPtr account_;
+  ::xchain::contract::sdk::SyscallHeader* header_;
+  mutable ::google::protobuf::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_contract_2eproto;
+};
+// -------------------------------------------------------------------
+
+class GetAccountAddressesResponse :
+    public ::google::protobuf::MessageLite /* @@protoc_insertion_point(class_definition:xchain.contract.sdk.GetAccountAddressesResponse) */ {
+ public:
+  GetAccountAddressesResponse();
+  virtual ~GetAccountAddressesResponse();
+
+  GetAccountAddressesResponse(const GetAccountAddressesResponse& from);
+
+  inline GetAccountAddressesResponse& operator=(const GetAccountAddressesResponse& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  #if LANG_CXX11
+  GetAccountAddressesResponse(GetAccountAddressesResponse&& from) noexcept
+    : GetAccountAddressesResponse() {
+    *this = ::std::move(from);
+  }
+
+  inline GetAccountAddressesResponse& operator=(GetAccountAddressesResponse&& from) noexcept {
+    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
+      if (this != &from) InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+  #endif
+  static const GetAccountAddressesResponse& default_instance();
+
+  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
+  static inline const GetAccountAddressesResponse* internal_default_instance() {
+    return reinterpret_cast<const GetAccountAddressesResponse*>(
+               &_GetAccountAddressesResponse_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    33;
+
+  void Swap(GetAccountAddressesResponse* other);
+  friend void swap(GetAccountAddressesResponse& a, GetAccountAddressesResponse& b) {
+    a.Swap(&b);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline GetAccountAddressesResponse* New() const final {
+    return CreateMaybeMessage<GetAccountAddressesResponse>(nullptr);
+  }
+
+  GetAccountAddressesResponse* New(::google::protobuf::Arena* arena) const final {
+    return CreateMaybeMessage<GetAccountAddressesResponse>(arena);
+  }
+  void CheckTypeAndMergeFrom(const ::google::protobuf::MessageLite& from)
+    final;
+  void CopyFrom(const GetAccountAddressesResponse& from);
+  void MergeFrom(const GetAccountAddressesResponse& from);
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  #if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
+  static const char* _InternalParse(const char* begin, const char* end, void* object, ::google::protobuf::internal::ParseContext* ctx);
+  ::google::protobuf::internal::ParseFunc _ParseFunc() const final { return _InternalParse; }
+  #else
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input) final;
+  #endif  // GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const final;
+  void DiscardUnknownFields();
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  void InternalSwap(GetAccountAddressesResponse* other);
+  private:
+  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
+    return nullptr;
+  }
+  inline void* MaybeArenaPtr() const {
+    return nullptr;
+  }
+  public:
+
+  ::std::string GetTypeName() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // repeated string addresses = 1;
+  int addresses_size() const;
+  void clear_addresses();
+  static const int kAddressesFieldNumber = 1;
+  const ::std::string& addresses(int index) const;
+  ::std::string* mutable_addresses(int index);
+  void set_addresses(int index, const ::std::string& value);
+  #if LANG_CXX11
+  void set_addresses(int index, ::std::string&& value);
+  #endif
+  void set_addresses(int index, const char* value);
+  void set_addresses(int index, const char* value, size_t size);
+  ::std::string* add_addresses();
+  void add_addresses(const ::std::string& value);
+  #if LANG_CXX11
+  void add_addresses(::std::string&& value);
+  #endif
+  void add_addresses(const char* value);
+  void add_addresses(const char* value, size_t size);
+  const ::google::protobuf::RepeatedPtrField<::std::string>& addresses() const;
+  ::google::protobuf::RepeatedPtrField<::std::string>* mutable_addresses();
+
+  // @@protoc_insertion_point(class_scope:xchain.contract.sdk.GetAccountAddressesResponse)
+ private:
+  class HasBitSetters;
+
+  ::google::protobuf::internal::InternalMetadataWithArenaLite _internal_metadata_;
+  ::google::protobuf::RepeatedPtrField<::std::string> addresses_;
   mutable ::google::protobuf::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_contract_2eproto;
 };
@@ -4673,6 +4961,59 @@ inline ::google::protobuf::RepeatedPtrField<::std::string>*
 CallArgs::mutable_auth_require() {
   // @@protoc_insertion_point(field_mutable_list:xchain.contract.sdk.CallArgs.auth_require)
   return &auth_require_;
+}
+
+// string transfer_amount = 5;
+inline void CallArgs::clear_transfer_amount() {
+  transfer_amount_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline const ::std::string& CallArgs::transfer_amount() const {
+  // @@protoc_insertion_point(field_get:xchain.contract.sdk.CallArgs.transfer_amount)
+  return transfer_amount_.GetNoArena();
+}
+inline void CallArgs::set_transfer_amount(const ::std::string& value) {
+  
+  transfer_amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:xchain.contract.sdk.CallArgs.transfer_amount)
+}
+#if LANG_CXX11
+inline void CallArgs::set_transfer_amount(::std::string&& value) {
+  
+  transfer_amount_.SetNoArena(
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:xchain.contract.sdk.CallArgs.transfer_amount)
+}
+#endif
+inline void CallArgs::set_transfer_amount(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  transfer_amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.CallArgs.transfer_amount)
+}
+inline void CallArgs::set_transfer_amount(const char* value, size_t size) {
+  
+  transfer_amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:xchain.contract.sdk.CallArgs.transfer_amount)
+}
+inline ::std::string* CallArgs::mutable_transfer_amount() {
+  
+  // @@protoc_insertion_point(field_mutable:xchain.contract.sdk.CallArgs.transfer_amount)
+  return transfer_amount_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline ::std::string* CallArgs::release_transfer_amount() {
+  // @@protoc_insertion_point(field_release:xchain.contract.sdk.CallArgs.transfer_amount)
+  
+  return transfer_amount_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline void CallArgs::set_allocated_transfer_amount(::std::string* transfer_amount) {
+  if (transfer_amount != nullptr) {
+    
+  } else {
+    
+  }
+  transfer_amount_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), transfer_amount);
+  // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.CallArgs.transfer_amount)
 }
 
 // -------------------------------------------------------------------
@@ -5835,7 +6176,60 @@ inline void TransferRequest::set_allocated_header(::xchain::contract::sdk::Sysca
   // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.TransferRequest.header)
 }
 
-// string to = 2;
+// string from = 2;
+inline void TransferRequest::clear_from() {
+  from_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline const ::std::string& TransferRequest::from() const {
+  // @@protoc_insertion_point(field_get:xchain.contract.sdk.TransferRequest.from)
+  return from_.GetNoArena();
+}
+inline void TransferRequest::set_from(const ::std::string& value) {
+  
+  from_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:xchain.contract.sdk.TransferRequest.from)
+}
+#if LANG_CXX11
+inline void TransferRequest::set_from(::std::string&& value) {
+  
+  from_.SetNoArena(
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:xchain.contract.sdk.TransferRequest.from)
+}
+#endif
+inline void TransferRequest::set_from(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  from_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.TransferRequest.from)
+}
+inline void TransferRequest::set_from(const char* value, size_t size) {
+  
+  from_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:xchain.contract.sdk.TransferRequest.from)
+}
+inline ::std::string* TransferRequest::mutable_from() {
+  
+  // @@protoc_insertion_point(field_mutable:xchain.contract.sdk.TransferRequest.from)
+  return from_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline ::std::string* TransferRequest::release_from() {
+  // @@protoc_insertion_point(field_release:xchain.contract.sdk.TransferRequest.from)
+  
+  return from_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline void TransferRequest::set_allocated_from(::std::string* from) {
+  if (from != nullptr) {
+    
+  } else {
+    
+  }
+  from_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from);
+  // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.TransferRequest.from)
+}
+
+// string to = 3;
 inline void TransferRequest::clear_to() {
   to_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -5888,7 +6282,7 @@ inline void TransferRequest::set_allocated_to(::std::string* to) {
   // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.TransferRequest.to)
 }
 
-// string amount = 3;
+// string amount = 4;
 inline void TransferRequest::clear_amount() {
   amount_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -6537,7 +6931,7 @@ inline void GetCallArgsRequest::set_allocated_header(::xchain::contract::sdk::Sy
 
 // TxInput
 
-// bytes ref_txid = 1;
+// string ref_txid = 1;
 inline void TxInput::clear_ref_txid() {
   ref_txid_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -6564,7 +6958,7 @@ inline void TxInput::set_ref_txid(const char* value) {
   ref_txid_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.TxInput.ref_txid)
 }
-inline void TxInput::set_ref_txid(const void* value, size_t size) {
+inline void TxInput::set_ref_txid(const char* value, size_t size) {
   
   ref_txid_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
@@ -6657,7 +7051,7 @@ inline void TxInput::set_allocated_from_addr(::std::string* from_addr) {
   // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.TxInput.from_addr)
 }
 
-// bytes amount = 6;
+// string amount = 6;
 inline void TxInput::clear_amount() {
   amount_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -6684,7 +7078,7 @@ inline void TxInput::set_amount(const char* value) {
   amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.TxInput.amount)
 }
-inline void TxInput::set_amount(const void* value, size_t size) {
+inline void TxInput::set_amount(const char* value, size_t size) {
   
   amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
@@ -6728,7 +7122,7 @@ inline void TxInput::set_frozen_height(::google::protobuf::int64 value) {
 
 // TxOutput
 
-// bytes amount = 1;
+// string amount = 1;
 inline void TxOutput::clear_amount() {
   amount_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -6755,7 +7149,7 @@ inline void TxOutput::set_amount(const char* value) {
   amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.TxOutput.amount)
 }
-inline void TxOutput::set_amount(const void* value, size_t size) {
+inline void TxOutput::set_amount(const char* value, size_t size) {
   
   amount_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
@@ -7250,7 +7644,7 @@ inline void Block::set_allocated_blockid(::std::string* blockid) {
   // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.Block.blockid)
 }
 
-// bytes pre_hash = 4;
+// string pre_hash = 4;
 inline void Block::clear_pre_hash() {
   pre_hash_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -7277,7 +7671,7 @@ inline void Block::set_pre_hash(const char* value) {
   pre_hash_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.Block.pre_hash)
 }
-inline void Block::set_pre_hash(const void* value, size_t size) {
+inline void Block::set_pre_hash(const char* value, size_t size) {
   
   pre_hash_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
@@ -7356,7 +7750,7 @@ inline void Block::set_allocated_proposer(::std::string* proposer) {
   // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.Block.proposer)
 }
 
-// bytes sign = 6;
+// string sign = 6;
 inline void Block::clear_sign() {
   sign_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -7383,7 +7777,7 @@ inline void Block::set_sign(const char* value) {
   sign_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.Block.sign)
 }
-inline void Block::set_sign(const void* value, size_t size) {
+inline void Block::set_sign(const char* value, size_t size) {
   
   sign_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
@@ -7573,7 +7967,7 @@ inline void Block::set_in_trunk(bool value) {
   // @@protoc_insertion_point(field_set:xchain.contract.sdk.Block.in_trunk)
 }
 
-// bytes next_hash = 15;
+// string next_hash = 15;
 inline void Block::clear_next_hash() {
   next_hash_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
@@ -7600,7 +7994,7 @@ inline void Block::set_next_hash(const char* value) {
   next_hash_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.Block.next_hash)
 }
-inline void Block::set_next_hash(const void* value, size_t size) {
+inline void Block::set_next_hash(const char* value, size_t size) {
   
   next_hash_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
@@ -7626,9 +8020,194 @@ inline void Block::set_allocated_next_hash(::std::string* next_hash) {
   // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.Block.next_hash)
 }
 
+// -------------------------------------------------------------------
+
+// GetAccountAddressesRequest
+
+// .xchain.contract.sdk.SyscallHeader header = 1;
+inline bool GetAccountAddressesRequest::has_header() const {
+  return this != internal_default_instance() && header_ != nullptr;
+}
+inline void GetAccountAddressesRequest::clear_header() {
+  if (GetArenaNoVirtual() == nullptr && header_ != nullptr) {
+    delete header_;
+  }
+  header_ = nullptr;
+}
+inline const ::xchain::contract::sdk::SyscallHeader& GetAccountAddressesRequest::header() const {
+  const ::xchain::contract::sdk::SyscallHeader* p = header_;
+  // @@protoc_insertion_point(field_get:xchain.contract.sdk.GetAccountAddressesRequest.header)
+  return p != nullptr ? *p : *reinterpret_cast<const ::xchain::contract::sdk::SyscallHeader*>(
+      &::xchain::contract::sdk::_SyscallHeader_default_instance_);
+}
+inline ::xchain::contract::sdk::SyscallHeader* GetAccountAddressesRequest::release_header() {
+  // @@protoc_insertion_point(field_release:xchain.contract.sdk.GetAccountAddressesRequest.header)
+  
+  ::xchain::contract::sdk::SyscallHeader* temp = header_;
+  header_ = nullptr;
+  return temp;
+}
+inline ::xchain::contract::sdk::SyscallHeader* GetAccountAddressesRequest::mutable_header() {
+  
+  if (header_ == nullptr) {
+    auto* p = CreateMaybeMessage<::xchain::contract::sdk::SyscallHeader>(GetArenaNoVirtual());
+    header_ = p;
+  }
+  // @@protoc_insertion_point(field_mutable:xchain.contract.sdk.GetAccountAddressesRequest.header)
+  return header_;
+}
+inline void GetAccountAddressesRequest::set_allocated_header(::xchain::contract::sdk::SyscallHeader* header) {
+  ::google::protobuf::Arena* message_arena = GetArenaNoVirtual();
+  if (message_arena == nullptr) {
+    delete header_;
+  }
+  if (header) {
+    ::google::protobuf::Arena* submessage_arena = nullptr;
+    if (message_arena != submessage_arena) {
+      header = ::google::protobuf::internal::GetOwnedMessage(
+          message_arena, header, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  header_ = header;
+  // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.GetAccountAddressesRequest.header)
+}
+
+// string account = 2;
+inline void GetAccountAddressesRequest::clear_account() {
+  account_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline const ::std::string& GetAccountAddressesRequest::account() const {
+  // @@protoc_insertion_point(field_get:xchain.contract.sdk.GetAccountAddressesRequest.account)
+  return account_.GetNoArena();
+}
+inline void GetAccountAddressesRequest::set_account(const ::std::string& value) {
+  
+  account_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:xchain.contract.sdk.GetAccountAddressesRequest.account)
+}
+#if LANG_CXX11
+inline void GetAccountAddressesRequest::set_account(::std::string&& value) {
+  
+  account_.SetNoArena(
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:xchain.contract.sdk.GetAccountAddressesRequest.account)
+}
+#endif
+inline void GetAccountAddressesRequest::set_account(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  account_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.GetAccountAddressesRequest.account)
+}
+inline void GetAccountAddressesRequest::set_account(const char* value, size_t size) {
+  
+  account_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:xchain.contract.sdk.GetAccountAddressesRequest.account)
+}
+inline ::std::string* GetAccountAddressesRequest::mutable_account() {
+  
+  // @@protoc_insertion_point(field_mutable:xchain.contract.sdk.GetAccountAddressesRequest.account)
+  return account_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline ::std::string* GetAccountAddressesRequest::release_account() {
+  // @@protoc_insertion_point(field_release:xchain.contract.sdk.GetAccountAddressesRequest.account)
+  
+  return account_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline void GetAccountAddressesRequest::set_allocated_account(::std::string* account) {
+  if (account != nullptr) {
+    
+  } else {
+    
+  }
+  account_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), account);
+  // @@protoc_insertion_point(field_set_allocated:xchain.contract.sdk.GetAccountAddressesRequest.account)
+}
+
+// -------------------------------------------------------------------
+
+// GetAccountAddressesResponse
+
+// repeated string addresses = 1;
+inline int GetAccountAddressesResponse::addresses_size() const {
+  return addresses_.size();
+}
+inline void GetAccountAddressesResponse::clear_addresses() {
+  addresses_.Clear();
+}
+inline const ::std::string& GetAccountAddressesResponse::addresses(int index) const {
+  // @@protoc_insertion_point(field_get:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  return addresses_.Get(index);
+}
+inline ::std::string* GetAccountAddressesResponse::mutable_addresses(int index) {
+  // @@protoc_insertion_point(field_mutable:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  return addresses_.Mutable(index);
+}
+inline void GetAccountAddressesResponse::set_addresses(int index, const ::std::string& value) {
+  // @@protoc_insertion_point(field_set:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  addresses_.Mutable(index)->assign(value);
+}
+#if LANG_CXX11
+inline void GetAccountAddressesResponse::set_addresses(int index, ::std::string&& value) {
+  // @@protoc_insertion_point(field_set:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  addresses_.Mutable(index)->assign(std::move(value));
+}
+#endif
+inline void GetAccountAddressesResponse::set_addresses(int index, const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  addresses_.Mutable(index)->assign(value);
+  // @@protoc_insertion_point(field_set_char:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+}
+inline void GetAccountAddressesResponse::set_addresses(int index, const char* value, size_t size) {
+  addresses_.Mutable(index)->assign(
+    reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_set_pointer:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+}
+inline ::std::string* GetAccountAddressesResponse::add_addresses() {
+  // @@protoc_insertion_point(field_add_mutable:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  return addresses_.Add();
+}
+inline void GetAccountAddressesResponse::add_addresses(const ::std::string& value) {
+  addresses_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+}
+#if LANG_CXX11
+inline void GetAccountAddressesResponse::add_addresses(::std::string&& value) {
+  addresses_.Add(std::move(value));
+  // @@protoc_insertion_point(field_add:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+}
+#endif
+inline void GetAccountAddressesResponse::add_addresses(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  addresses_.Add()->assign(value);
+  // @@protoc_insertion_point(field_add_char:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+}
+inline void GetAccountAddressesResponse::add_addresses(const char* value, size_t size) {
+  addresses_.Add()->assign(reinterpret_cast<const char*>(value), size);
+  // @@protoc_insertion_point(field_add_pointer:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+}
+inline const ::google::protobuf::RepeatedPtrField<::std::string>&
+GetAccountAddressesResponse::addresses() const {
+  // @@protoc_insertion_point(field_list:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  return addresses_;
+}
+inline ::google::protobuf::RepeatedPtrField<::std::string>*
+GetAccountAddressesResponse::mutable_addresses() {
+  // @@protoc_insertion_point(field_mutable_list:xchain.contract.sdk.GetAccountAddressesResponse.addresses)
+  return &addresses_;
+}
+
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

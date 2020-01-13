@@ -9,11 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/client"
+	docker "github.com/fsouza/go-dockerclient"
 	log "github.com/xuperchain/log15"
 	"google.golang.org/grpc"
 
 	pb "github.com/xuperchain/xuperunion/contractsdk/go/pb"
+	pbrpc "github.com/xuperchain/xuperunion/contractsdk/go/pbrpc"
 	"github.com/xuperchain/xuperunion/crypto/hash"
 	xpb "github.com/xuperchain/xuperunion/pb"
 )
@@ -41,7 +42,7 @@ type standardNativeContract struct {
 
 	lostBeatheart bool
 	mutex         *sync.Mutex
-	rpcClient     pb.NativeCodeClient
+	rpcClient     pbrpc.NativeCodeClient
 	desc          *xpb.NativeCodeDesc
 
 	process       Process
@@ -51,6 +52,8 @@ type standardNativeContract struct {
 	mgr  *GeneralSCFramework
 	vsnc *versionedStandardNativeContract
 	log.Logger
+
+	dockerClient *docker.Client
 }
 
 func (snc *standardNativeContract) Init() error {
@@ -66,7 +69,7 @@ func (snc *standardNativeContract) Init() error {
 	if err != nil {
 		return err
 	}
-	snc.rpcClient = pb.NewNativeCodeClient(conn)
+	snc.rpcClient = pbrpc.NewNativeCodeClient(conn)
 	return nil
 }
 
@@ -128,14 +131,13 @@ func (snc *standardNativeContract) GetNativeCodeDigest() ([]byte, error) {
 
 func (snc *standardNativeContract) newProcess() Process {
 	if snc.mgr.cfg.Docker.Enable {
-		client, _ := client.NewEnvClient()
 		return &DockerProcess{
 			basedir:       snc.basedir,
 			binpath:       snc.binpath,
 			sockpath:      snc.sockpath,
 			chainSockPath: snc.chainSockPath,
 			cfg:           &snc.mgr.cfg.Docker,
-			client:        client,
+			client:        snc.dockerClient,
 			Logger:        snc.Logger.New("module", "DockerProcess"),
 		}
 	}

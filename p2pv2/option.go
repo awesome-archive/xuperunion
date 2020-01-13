@@ -4,7 +4,10 @@ type msgOptions struct {
 	filters         []FilterStrategy
 	bcname          string
 	targetPeerAddrs []string
+	targetPeerIDs   []string
 	percentage      float32 //percentage wait for return
+	// compress
+	compress bool
 }
 
 // MessageOption define single option function
@@ -24,6 +27,13 @@ func WithBcName(bcname string) MessageOption {
 	}
 }
 
+// WithCompress set compredded to message option
+func WithCompress(compress bool) MessageOption {
+	return func(o *msgOptions) {
+		o.compress = compress
+	}
+}
+
 // WithPercentage add percentage to message option
 func WithPercentage(percentage float32) MessageOption {
 	return func(o *msgOptions) {
@@ -38,11 +48,17 @@ func WithTargetPeerAddrs(peerAddrs []string) MessageOption {
 	}
 }
 
+// WithTargetPeerIDs add target peer IDs to message option
+func WithTargetPeerIDs(pid []string) MessageOption {
+	return func(o *msgOptions) {
+		o.targetPeerIDs = pid
+	}
+}
+
 // getMessageOption create MessageOptions with given options
 func getMessageOption(opts []MessageOption) *msgOptions {
 	msgOpts := &msgOptions{
 		percentage: 1,
-		filters:    []FilterStrategy{DefaultStrategy},
 	}
 	for _, f := range opts {
 		f(msgOpts)

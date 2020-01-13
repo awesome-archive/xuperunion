@@ -31,6 +31,9 @@ XuperUnion is the underlying solution for union networks with following highligh
 
 * **Flexibility**:  Modular and pluggable design provides high flexibility for users to build their blockchain solutions for various business scenarios.
 
+## Contact
+E-mail: xchain-help@baidu.com
+
 ## Quick start
 
 ### Requirements
@@ -48,7 +51,7 @@ Clone the repository
 git clone https://github.com/xuperchain/xuperunion
 ```
 
-**Note**: `master` branch contains latest features but might be **unstable**. for production use, please checkout our release branch. the latest release branch is `v3.1`.
+**Note**: `master` branch contains latest features but might be **unstable**. for production use, please checkout our release branch. the latest release branch is `v3.4`.
 
 Enter the xuperunion folder and build the code:
 
@@ -69,6 +72,7 @@ make test
 There is an output folder if build successfully. Enter the output folder, create a default chain firstly:
 
 ```
+cd ./output
 ./xchain-cli createChain
 ```
 
@@ -167,7 +171,7 @@ XuperUnion is under the [Apache License, Version 2.0](https://github.com/xuperch
 git clone https://github.com/xuperchain/xuperunion
 ```
 
-**注意**: `master` 分支是日常开发分支，会包含最新的功能，但是 **不稳定**。生产环境请使用最新的已发布分支，最新的已发布分支是`v3.1`。
+**注意**: `master` 分支是日常开发分支，会包含最新的功能，但是 **不稳定**。生产环境请使用最新的已发布分支，最新的已发布分支是`v3.4`。
 
 编译
 ```
@@ -182,6 +186,7 @@ make test
 
 单机版xchain
 ```
+cd ./output
 ./xchain-cli createChain
 nohup ./xchain &
 ./xchain-cli status
@@ -223,6 +228,8 @@ docker exec -ti xchain bash
 XuperUnion使用的许可证是Apache 2.0
 
 ## 联系我们
+商务合作，请Email：xchain-help@baidu.com, 来源请注明Github。
 如果你对XuperChain开源技术及应用感兴趣，欢迎添加“百度超级链·小助手“微信，回复“技术论坛进群”，加入“百度超级链开发者社区”，与百度资深工程师深度交流!微信二维码如下:
 
 ![微信二维码](https://github.com/ToWorld/xuperchain-image/blob/master/baidu-image-xuperchain.png)
+

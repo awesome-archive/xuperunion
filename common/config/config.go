@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -27,7 +28,9 @@ const (
 	// limitation size for same ip
 	DefaultStreamIPLimitSize     = 10
 	DefaultMaxBroadcastPeers     = 20
-	DefaultMaxBroadcastCorePeers = 10
+	DefaultMaxBroadcastCorePeers = 17
+	DefaultIsStorePeers          = false
+	DefaultP2PDataPath           = "./data/p2p"
 )
 
 // LogConfig is the log config of node
@@ -75,7 +78,7 @@ type P2PConfig struct {
 	// bootNodes config the bootNodes the node to connect
 	BootNodes []string `yaml:"bootNodes,omitempty"`
 	// staticNodes config the nodes which you trust
-	StaticNodes []string `yaml:"staticNodes,omitempty"`
+	StaticNodes map[string][]string `yaml:"staticNodes,omitempty"`
 	// maxStreamLimits config the max stream num
 	MaxStreamLimits int32 `yaml:"maxStreamLimits,omitempty"`
 	// maxMessageSize config the max message size
@@ -93,6 +96,10 @@ type P2PConfig struct {
 	// this only works when NodeConfig.CoreConnection is true. Note that the number
 	// of core peers is included in MaxBroadcastPeers.
 	MaxBroadcastCorePeers int `yaml:"maxBroadcastCorePeers,omitempty"`
+	// P2PDataPath stores the peer info connected last time
+	P2PDataPath string `yaml:"p2PDataPath,omitempty"`
+	// IsStorePeers determine wherther storing the peers infos
+	IsStorePeers bool `yaml:"isStorePeers,omitempty"`
 }
 
 // MinerConfig is the config of miner
@@ -107,18 +114,12 @@ type UtxoConfig struct {
 	CacheSize             int                        `yaml:"cachesize,omitempty"`
 	TmpLockSeconds        int                        `yaml:"tmplockSeconds,omitempty"`
 	AsyncMode             bool                       `yaml:"asyncMode,omitempty"`
+	AsyncBlockMode        bool                       `yaml:"asyncBlockMode,omitempty"`
 	ContractExecutionTime int                        `yaml:"contractExecutionTime,omitempty"`
 	ContractWhiteList     map[string]map[string]bool `yaml:"contractWhiteList,omitempty"`
 	// 是否开启新版本tx k = bcname, v = isBetaTx
 	IsBetaTx          map[string]bool `yaml:"isBetaTx,omitempty"`
 	MaxConfirmedDelay uint32          `yaml:"maxConfirmedDelay,omitempty"`
-}
-
-// FeeConfig is the config of Fee
-type FeeConfig struct {
-	NeedFee bool `yaml:"needFee,omitempty"`
-	// UnitFee tx 每kb大小的单价
-	UnitFee int64 `yaml:"unitFee,omitempty"`
 }
 
 // NativeDeployConfig native contract deploy config
@@ -143,6 +144,7 @@ type NativeConfig struct {
 	StopTimeout int
 	Deploy      NativeDeployConfig
 	Docker      NativeDockerConfig
+	Enable      bool
 }
 
 // XVMConfig contains the xvm configuration
@@ -160,6 +162,10 @@ type WasmConfig struct {
 	XVM            XVMConfig
 	EnableDebugLog bool
 	DebugLog       LogConfig
+}
+
+func (w *WasmConfig) applyFlags(flags *pflag.FlagSet) {
+	flags.StringVar(&w.Driver, "vm", w.Driver, "contract vm driver")
 }
 
 // ConsoleConfig is the command config user input
@@ -188,7 +194,6 @@ type NodeConfig struct {
 	DedupCacheSize  int             `yaml:"dedupCacheSize,omitempty"`
 	DedupTimeLimit  int             `yaml:"dedupTimeLimit,omitempty"`
 	Kernel          KernelConfig    `yaml:"kernel,omitempty"`
-	FeeConfig       FeeConfig       `yaml:"feeConfig,omitempty"`
 	CPUProfile      string          `yaml:"cpuprofile,omitempty"`
 	MemProfile      string          `yaml:"memprofile,omitempty"`
 	MemberWhiteList map[string]bool `yaml:"memberWhiteList,omitempty"`
@@ -198,17 +203,44 @@ type NodeConfig struct {
 	// NORMAL: 为普通的全节点模式
 	// FAST_SYNC 模式下:节点需要连接一个可信的全节点; 拒绝事务提交; 同步区块时跳过块验证和tx验证; 去掉load未确认事务;
 	NodeMode        string     `yaml:"nodeMode,omitempty"`
-	PluginConfPath  string     `yaml:"pluginConfPath,omitempty"`
+	PluginConfPath  string     `yaml:"pluginConfPath,omitempty"` // plugin config file path
+	PluginLoadPath  string     `yaml:"pluginLoadPath,omitempty"` // plugin auto-load path
 	EtcdClusterAddr string     `yaml:"etcdClusterAddr,omitempty"`
 	GatewaySwitch   bool       `yaml:"gatewaySwitch,omitempty"`
 	Wasm            WasmConfig `yaml:"wasm,omitempty"`
 	CoreConnection  bool       `yaml:"coreConnection,omitempty"`
+	FailSkip        bool       `yaml:"failSkip,omitempty"`
+	ModifyBlockAddr string     `yaml:"modifyBlockAddr,omitempty"`
+	EnableXEndorser bool       `yaml:"enableXEndorser,omitempty"`
+	// TxCacheExpiredTime expired time for tx cache
+	TxidCacheExpiredTime time.Duration `yaml:"txidCacheExpiredTime,omitempty"`
+	// local switch of compressed
+	EnableCompress bool `yaml:"enableCompress,omitempty"`
+	// prune ledger option
+	Prune PruneOption `yaml:"prune,omitempty"`
+
+	// BlockBroadcaseMode is the mode for broadcast new block
+	//  * Full_BroadCast_Mode = 0, means send full block data
+	//  * Interactive_BroadCast_Mode = 1, means send block id and the receiver get block data by itself
+	//  * Mixed_BroadCast_Mode = 2, means miner use Full_BroadCast_Mode, other nodes use Interactive_BroadCast_Mode
+	//  1. 一种是完全块广播模式(Full_BroadCast_Mode)，即直接广播原始块给所有相邻节点;
+	//  2. 一种是问询式块广播模式(Interactive_BroadCast_Mode)，即先广播新块的头部给相邻节点，
+	//     相邻节点在没有相同块的情况下通过GetBlock主动获取块数据.
+	//  3. Mixed_BroadCast_Mode是指出块节点将新块用Full_BroadCast_Mode模式广播，其他节点使用Interactive_BroadCast_Mode
+	BlockBroadcaseMode uint8 `yaml:"blockBroadcaseMode,omitempty"`
 }
 
 // KernelConfig kernel config
 type KernelConfig struct {
 	MinNewChainAmount string          `yaml:"minNewChainAmount,omitempty"`
 	NewChainWhiteList map[string]bool `yaml:"newChainWhiteList,omitempty"`
+}
+
+// PruneOption ledger prune option
+type PruneOption struct {
+	Switch        bool   `yaml:"switch,omitempty"`
+	Bcname        string `yaml:"bcname,omitempty"`
+	TargetBlockid string `yaml:"targetBlockid,omitempty"`
 }
 
 // DBCacheConfig db cache config
@@ -249,12 +281,14 @@ func (nc *NodeConfig) defaultNodeConfig() {
 		Keypath: "./data/keys",
 	}
 	nc.PluginConfPath = "./conf/plugins.conf"
+	nc.PluginLoadPath = "./plugins/autoload/"
 	nc.Datapath = "./data/blockchain"
 	nc.Utxo = UtxoConfig{
 		NonUtxo:               false,
 		CacheSize:             100000,
 		TmpLockSeconds:        60,
 		AsyncMode:             false,
+		AsyncBlockMode:        false,
 		ContractExecutionTime: 500,
 		ContractWhiteList:     make(map[string]map[string]bool),
 		IsBetaTx:              make(map[string]bool),
@@ -269,10 +303,6 @@ func (nc *NodeConfig) defaultNodeConfig() {
 		FdCacheSize:  1024, //fd count for each leveldb
 	}
 	nc.DedupTimeLimit = 15 //seconds
-	nc.FeeConfig = FeeConfig{
-		NeedFee: false,
-		UnitFee: 1,
-	}
 	nc.MemberWhiteList = make(map[string]bool)
 	nc.NodeMode = NodeModeNormal
 	nc.Wasm = WasmConfig{
@@ -294,6 +324,10 @@ func (nc *NodeConfig) defaultNodeConfig() {
 		},
 	}
 	nc.CoreConnection = false
+	nc.FailSkip = false
+	nc.ModifyBlockAddr = ""
+	nc.EnableXEndorser = false
+	nc.BlockBroadcaseMode = 0
 }
 
 // NewNodeConfig returns a config of a node
@@ -319,6 +353,9 @@ func newP2pConfigWithDefault() P2PConfig {
 		StreamIPLimitSize:     DefaultStreamIPLimitSize,
 		MaxBroadcastPeers:     DefaultMaxBroadcastPeers,
 		MaxBroadcastCorePeers: DefaultMaxBroadcastCorePeers,
+		IsStorePeers:          DefaultIsStorePeers,
+		P2PDataPath:           DefaultP2PDataPath,
+		StaticNodes:           make(map[string][]string),
 	}
 }
 
@@ -386,6 +423,7 @@ func (utxo *UtxoConfig) applyFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&utxo.CacheSize, "cachesize", utxo.CacheSize, "used for config overwrite --cachesize <utxo LRU cache size>")
 	flags.IntVar(&utxo.TmpLockSeconds, "tmplockSeconds", utxo.TmpLockSeconds, "used for config overwrite --tmplockSeconds <How long to lock utxo referenced by GenerateTx>")
 	flags.BoolVar(&utxo.AsyncMode, "asyncMode", utxo.AsyncMode, "used for config overwrite --asyncMode")
+	flags.BoolVar(&utxo.AsyncBlockMode, "asyncBlockMode", utxo.AsyncBlockMode, "used for config overwrite --asyncBlockMode")
 }
 
 // ApplyFlags install flags and use flags to overwrite config file
@@ -396,12 +434,16 @@ func (nc *NodeConfig) ApplyFlags(flags *pflag.FlagSet) {
 	nc.Miner.applyFlags(flags)
 	nc.ConsoleConfig.ApplyFlags(flags)
 	nc.Utxo.applyFlags(flags)
+	nc.Wasm.applyFlags(flags)
 
 	flags.StringVar(&nc.Datapath, "datapath", nc.Datapath, "used for config overwrite --datapath <data path>")
 	flags.StringVar(&nc.CPUProfile, "cpuprofile", nc.CPUProfile, "used to store cpu profile data --cpuprofile <pprof file>")
 	flags.StringVar(&nc.MemProfile, "memprofile", nc.MemProfile, "used to store mem profile data --memprofile <pprof file>")
 
 	flags.StringVar(&nc.PluginConfPath, "pluginConfPath", nc.PluginConfPath, "used for config overwrite --pluginConfPath <plugin conf path>")
+
+	flags.BoolVar(&nc.FailSkip, "failSkip", nc.FailSkip, "used for config overwrite --failSkip <>")
+	flags.StringVar(&nc.ModifyBlockAddr, "modifyBlockAddr", nc.ModifyBlockAddr, "used for config overwrite --modifyBlockAddr <>")
 }
 
 // VisitAll print all config of node

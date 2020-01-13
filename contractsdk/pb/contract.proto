@@ -1,13 +1,8 @@
 syntax = "proto3";
 option optimize_for = LITE_RUNTIME;
+option go_package = "github.com/xuperchain/xuperunion/contractsdk/go/pb";
 
 package xchain.contract.sdk;
-
-// service provided by chain code, called by xchain
-service NativeCode {
-  rpc Call(NativeCallRequest) returns (NativeCallResponse);
-  rpc Ping(PingRequest) returns (PingResponse);
-}
 
 message PingRequest {
 }
@@ -33,28 +28,8 @@ message CallArgs {
   repeated ArgPair args = 2;
   string initiator = 3;
   repeated string auth_require = 4;
+  string transfer_amount = 5;
 }
-
-// xchain syscall service
-service Syscall {
-  // KV service
-  rpc PutObject(PutRequest) returns (PutResponse);
-  rpc GetObject(GetRequest) returns (GetResponse);
-  rpc DeleteObject(DeleteRequest) returns (DeleteResponse);
-  rpc NewIterator(IteratorRequest) returns (IteratorResponse);
-
-  // Chain service
-  rpc QueryTx(QueryTxRequest) returns (QueryTxResponse);
-  rpc QueryBlock(QueryBlockRequest) returns (QueryBlockResponse);
-  rpc Transfer(TransferRequest) returns (TransferResponse);
-  rpc ContractCall(ContractCallRequest) returns (ContractCallResponse);
-
-  // Heartbeat
-  rpc Ping(PingRequest) returns (PingResponse);
-
-  rpc GetCallArgs(GetCallArgsRequest) returns (CallArgs);
-  rpc SetOutput(SetOutputRequest) returns (SetOutputResponse);
-} 
 
 message SyscallHeader {
   int64 ctxid = 1;
@@ -126,8 +101,9 @@ message QueryBlockResponse {
 
 message TransferRequest {
   SyscallHeader header = 1;
-  string to = 2;
-  string amount = 3;
+  string from = 2;
+  string to = 3;
+  string amount = 4;
 }
 
 message TransferResponse {
@@ -166,13 +142,13 @@ message GetCallArgsRequest {
 message TxInput
 {
     // The transaction id referenced to
-    bytes ref_txid = 1;
+    string ref_txid = 1;
     // The output offset of the transaction referenced to
     int32 ref_offset = 2;
     // The address of the launcher
     bytes from_addr = 5;
     // The amount of the transaction
-    bytes amount = 6;
+    string amount = 6;
     // Frozen height
     int64 frozen_height = 7;
 }
@@ -181,7 +157,7 @@ message TxInput
 message TxOutput
 {
     // The amount of the transaction
-    bytes amount = 1;
+    string amount = 1;
     // The address of the launcher
     bytes to_addr = 2;
     // Fronzen height
@@ -215,11 +191,11 @@ message Block
     // blockid generate the hash sign of the block used by sha256
     string blockid = 3;
     // pre_hash is the parent blockid of the block
-    bytes pre_hash = 4;
+    string pre_hash = 4;
     // The miner id
     bytes proposer = 5;
     // The sign which miner signed: blockid + nonce + timestamp
-    bytes sign = 6;
+    string sign = 6;
     // The pk of the miner
     bytes pubkey =  7;
     // The height of the blockchain
@@ -232,7 +208,14 @@ message Block
     // If the block is on the trunk
     bool in_trunk = 14;
     // Next next block which on trunk
-    bytes next_hash = 15;
+    string next_hash = 15;
 }
 
+message GetAccountAddressesRequest{
+  SyscallHeader header = 1;
+  string account = 2;
+}
 
+message GetAccountAddressesResponse {
+  repeated string addresses = 1;
+}

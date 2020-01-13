@@ -28,7 +28,6 @@ func (m *math) Initialize(nci code.Context) code.Response {
 }
 
 func (m *math) Invoke(nci code.Context) code.Response {
-	var resp code.Response
 	args := nci.Args()
 	body := map[string]string{}
 	action := string(args["action"])
@@ -46,7 +45,7 @@ func (m *math) Invoke(nci code.Context) code.Response {
 	} else if action == "querytx" {
 		id := string(args["id"])
 		rawid, _ := hex.DecodeString(id)
-		tx, err := nci.QueryTx(rawid)
+		tx, err := nci.QueryTx(string(rawid))
 		if err != nil {
 			return code.Error(err)
 		}
@@ -55,7 +54,7 @@ func (m *math) Invoke(nci code.Context) code.Response {
 	} else if action == "queryblock" {
 		id := string(args["id"])
 		rawid, _ := hex.DecodeString(id)
-		block, err := nci.QueryBlock(rawid)
+		block, err := nci.QueryBlock(string(rawid))
 		if err != nil {
 		}
 		out, _ := json.MarshalIndent(block, "", "  ")
@@ -94,12 +93,7 @@ func (m *math) Invoke(nci code.Context) code.Response {
 		}
 	}
 	bodyStr, _ := json.Marshal(body)
-	resp = code.Response{
-		Status:  200,
-		Body:    []byte(nil),
-		Message: string(bodyStr),
-	}
-	return resp
+	return code.OK(bodyStr)
 }
 
 func (m *math) Query(nci code.Context) code.Response {

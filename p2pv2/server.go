@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/pkg/errors"
 	log "github.com/xuperchain/log15"
 
@@ -97,6 +98,16 @@ func (p *P2PServerV2) SendMessage(ctx context.Context, msg *p2pPb.XuperMessage,
 	msgOpts := getMessageOption(opts)
 	filter := p.getFilter(msgOpts)
 	peers, _ := filter.Filter()
+	// 是否需要经过压缩,针对由本节点产生的消息以及grpc获取的信息
+	if needCompress := p.getCompress(msgOpts); needCompress {
+		// 更新MsgInfo & Header.enableCompress
+		// 重新计算CheckSum
+		enableCompress := msg.Header.EnableCompress
+		// msg原本没有被压缩
+		if !enableCompress {
+			msg = p2pPb.Compress(msg)
+		}
+	}
 	p.log.Trace("Server SendMessage", "logid", msg.GetHeader().GetLogid(), "msgType", msg.GetHeader().GetType(), "checksum", msg.GetHeader().GetDataCheckSum())
 	return p.node.SendMessage(ctx, msg, peers)
 }
@@ -109,7 +120,8 @@ func (p *P2PServerV2) SendMessageWithResponse(ctx context.Context, msg *p2pPb.Xu
 	filter := p.getFilter(msgOpts)
 	peers, _ := filter.Filter()
 	percentage := msgOpts.percentage
-	p.log.Trace("Server SendMessage with response", "logid", msg.GetHeader().GetLogid(), "msgType", msg.GetHeader().GetType(), "checksum", msg.GetHeader().GetDataCheckSum())
+	p.log.Trace("Server SendMessage with response", "logid", msg.GetHeader().GetLogid(),
+		"msgType", msg.GetHeader().GetType(), "checksum", msg.GetHeader().GetDataCheckSum(), "peers", peers)
 	return p.node.SendMessageWithResponse(ctx, msg, peers, percentage)
 }
 
@@ -129,10 +141,24 @@ func (p *P2PServerV2) GetNetURL() string {
 	return fmt.Sprintf("/ip4/127.0.0.1/tcp/%v/p2p/%s", p.config.Port, p.node.id.Pretty())
 }
 
+func (p *P2PServerV2) getCompress(opts *msgOptions) bool {
+	if opts == nil {
+		return false
+	}
+	return opts.compress
+}
+
 func (p *P2PServerV2) getFilter(opts *msgOptions) PeersFilter {
+	// All filtering strategies will invalid if
+	if len(p.node.staticNodes[opts.bcname]) != 0 {
+		return &StaticNodeStrategy{node: p.node, bcname: opts.bcname}
+	}
 	fs := opts.filters
 	bcname := opts.bcname
-	if len(fs) == 0 {
+	peerids := make([]peer.ID, 0)
+	tpaLen := len(opts.targetPeerAddrs)
+	tpiLen := len(opts.targetPeerIDs)
+	if len(fs) == 0 && tpaLen == 0 && tpiLen == 0 {
 		return &BucketsFilter{node: p.node}
 	}
 	pfs := make([]PeersFilter, 0)
@@ -152,10 +178,33 @@ func (p *P2PServerV2) getFilter(opts *msgOptions) PeersFilter {
 		}
 		pfs = append(pfs, filter)
 	}
-	if len(pfs) > 1 {
-		return NewMultiStrategy(p.node, pfs)
+	// process target peer addresses
+	if tpaLen > 0 {
+		// connect to extra target peers async
+		go p.node.ConnectToPeersByAddr(opts.targetPeerAddrs)
+		// get corresponding peer ids
+		for _, addr := range opts.targetPeerAddrs {
+			pid, err := GetIDFromAddr(addr)
+			if err != nil {
+				p.log.Warn("getFilter parse peer address failed", "paddr", addr, "error", err)
+				continue
+			}
+			peerids = append(peerids, pid)
+		}
 	}
-	return pfs[0]
+
+	// process target peer IDs
+	if tpiLen > 0 {
+		for _, tpid := range opts.targetPeerIDs {
+			peerid, err := peer.IDB58Decode(tpid)
+			if err != nil {
+				p.log.Warn("getFilter parse peer ID failed", "pid", tpid, "error", err)
+				continue
+			}
+			peerids = append(peerids, peerid)
+		}
+	}
+	return NewMultiStrategy(p.node, pfs, peerids)
 }
 
 // GetPeerUrls 查询所连接节点的信息

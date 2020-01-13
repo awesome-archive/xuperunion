@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	log "github.com/xuperchain/log15"
+	cons_base "github.com/xuperchain/xuperunion/consensus/base"
 	"github.com/xuperchain/xuperunion/contract"
 	crypto_client "github.com/xuperchain/xuperunion/crypto/client"
 	"github.com/xuperchain/xuperunion/ledger"
@@ -103,8 +104,7 @@ func TestValidateRevokeVote(t *testing.T) {
 	if err != nil {
 		t.Error("NewLedger error ", err.Error())
 	}
-	utxoVM, _ := utxo.NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
-	tx, gensisErr := utxoVM.GenerateRootTx([]byte(`
+	tx, gensisErr := utxo.GenerateRootTx([]byte(`
     {
         "version" : "1" 
         , "consensus" : { 
@@ -136,6 +136,7 @@ func TestValidateRevokeVote(t *testing.T) {
 	if !confirmStatus.Succ {
 		t.Error("ConfirmBlock error ")
 	}
+	utxoVM, _ := utxo.NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
 	playErr := utxoVM.Play(block.Blockid)
 	if playErr != nil {
 		t.Error("utxo vm paly error ", playErr.Error())
@@ -158,6 +159,11 @@ func TestValidateRevokeVote(t *testing.T) {
 	txReq.FromAddr = AliceAddress
 	txReq.FromPubkey = AlicePubkey
 	txReq.FromScrkey = AlicePrivateKey
+	txDataAccount := &pb.TxDataAccount{
+		Address: AliceAddress,
+		Amount:  "1",
+	}
+	txReq.Account = append(txReq.Account, txDataAccount)
 	txCons, errCons := utxoVM.GenerateTx(txReq)
 	if errCons != nil {
 		t.Error("GenerateTx error ", errCons.Error())
@@ -215,7 +221,7 @@ func TestValidateRevokeVote(t *testing.T) {
 
 	voteInfo, errValid := tdpos.validateVote(desc3)
 	if errValid != nil {
-		t.Error("validateVote error ", errValid.Error())
+		t.Error("validateVote error ", errValid.Error(), desc3)
 	} else {
 		t.Log("voteInfo ", voteInfo)
 	}
@@ -235,8 +241,7 @@ func TestTermProposerBasic(t *testing.T) {
 	if err != nil {
 		t.Error("NewLedger error ", err.Error())
 	}
-	utxoVM, _ := utxo.NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
-	tx, gensisErr := utxoVM.GenerateRootTx([]byte(`
+	tx, gensisErr := utxo.GenerateRootTx([]byte(`
     {
         "version" : "1"
         , "consensus" : {
@@ -268,6 +273,7 @@ func TestTermProposerBasic(t *testing.T) {
 	if !confirmStatus.Succ {
 		t.Error("ledger confirm block error ")
 	}
+	utxoVM, _ := utxo.NewUtxoVM("xuper", ledger, workspace, minerPrivateKey, minerPublicKey, []byte(minerAddress), nil, false, kvengine, tCryptoType)
 	playErr := utxoVM.Play(block.Blockid)
 	if playErr != nil {
 		t.Error("utxo play error ", playErr.Error())
@@ -289,17 +295,17 @@ func TestTermProposerBasic(t *testing.T) {
 			proposerNum:       int64(1),
 			blockNum:          int64(20),
 			voteUnitPrice:     big.NewInt(12),
-			initProposer: map[int64][]*CandidateInfo{
-				1: []*CandidateInfo{
-					&CandidateInfo{
+			initProposer: map[int64][]*cons_base.CandidateInfo{
+				1: []*cons_base.CandidateInfo{
+					&cons_base.CandidateInfo{
 						Address:  "Y4TmpfV4pvhYT5W17J7TqHSLo6cqq23x3",
 						PeerAddr: "peerid1",
 					},
-					&CandidateInfo{
+					&cons_base.CandidateInfo{
 						Address:  "RUEMFGDEnLBpnYYggnXukpVfR9Skm59ph",
 						PeerAddr: "peerid2",
 					},
-					&CandidateInfo{
+					&cons_base.CandidateInfo{
 						Address:  "bob",
 						PeerAddr: "peerid3",
 					},
@@ -309,7 +315,7 @@ func TestTermProposerBasic(t *testing.T) {
 	}
 	tdpos.context = &contract.TxContext{}
 	tdpos.context.UtxoBatch = tdpos.utxoVM.NewBatch()
-	canInfo := &CandidateInfo{
+	canInfo := &cons_base.CandidateInfo{
 		Address:  "f3prTg9itaZY6m48wXXikXdcxiByW7zgk",
 		PeerAddr: "peerid4",
 	}

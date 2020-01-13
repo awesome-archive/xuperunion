@@ -70,7 +70,7 @@ func (x *XModelContext) CommitCache() error {
 
 // NewCache create model cache instance
 func (x *XModelContext) NewCache() error {
-	cache, err := xmodel.NewXModelCache(x.Model, true)
+	cache, err := xmodel.NewXModelCache(x.Model, nil)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func openDB(dbPath string, logger log.Logger) (kvdb.Database, error) {
 }
 
 // WithXModelContext set xmodel context
-func WithXModelContext(t *testing.T, callback func(x *XModelContext)) {
+func WithXModelContext(t testing.TB, callback func(x *XModelContext)) {
 	logger := log.New("module", "xmodel")
 	logger.SetHandler(log.StreamHandler(os.Stderr, log.LogfmtFormat()))
 	basedir, err := ioutil.TempDir("", "xmodel-data")
@@ -125,11 +125,11 @@ func WithXModelContext(t *testing.T, callback func(x *XModelContext)) {
 		t.Fatal(err)
 	}
 	defer stateDB.Close()
-	model, err := xmodel.NewXuperModel("xuper", ledger, stateDB, logger)
+	model, err := xmodel.NewXuperModel(ledger, stateDB, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cache, err := xmodel.NewXModelCache(model, true)
+	cache, err := xmodel.NewXModelCache(model, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

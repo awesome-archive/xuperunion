@@ -28,10 +28,9 @@ func genArgs(req []*pb.InvokeRequest) *reservedArgs {
 // but the transaction does not contains reserved requests.
 func (uv *UtxoVM) verifyReservedWhitelist(tx *pb.Transaction) bool {
 	// verify reservedContracts len
-	reservedContracts := uv.ledger.GetMeta().ReservedContracts
-	uv.xlog.Warn("meta in verifyReservedWhitelist", "meta in", uv.ledger.GetMeta().ReservedContracts)
+	reservedContracts := uv.GetReservedContracts()
 	if len(reservedContracts) == 0 {
-		uv.xlog.Info("verifyReservedWhitelist false reservedReqs is nil")
+		uv.xlog.Info("verifyReservedWhitelist false reservedReqs is empty")
 		return false
 	}
 
@@ -117,17 +116,11 @@ func (uv *UtxoVM) verifyReservedContractRequests(reservedReqs, txReqs []*pb.Invo
 
 // geReservedContractRequest get reserved contract requests from system params, it doesn't consume gas.
 func (uv *UtxoVM) getReservedContractRequests(req []*pb.InvokeRequest, isPreExec bool) ([]*pb.InvokeRequest, error) {
-	reservedContractstpl := []*pb.InvokeRequest{}
-	originalReservedContracts, err := uv.ledger.GenesisBlock.GetConfig().GetReservedContract()
-	if err != nil {
-		return nil, err
+	MetaReservedContracts := uv.GetReservedContracts()
+	if MetaReservedContracts == nil {
+		return nil, nil
 	}
-	MetaReservedContracts := uv.ledger.GetMeta().ReservedContracts
-	if MetaReservedContracts != nil {
-		reservedContractstpl = MetaReservedContracts
-	} else {
-		reservedContractstpl = originalReservedContracts
-	}
+	reservedContractstpl := MetaReservedContracts
 	uv.xlog.Info("MetaReservedContracts", "reservedContracts", reservedContractstpl)
 
 	// if all reservedContracts have not been updated, return nil, nil

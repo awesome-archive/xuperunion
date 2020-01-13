@@ -21,6 +21,8 @@ type Instance interface {
 	ResourceUsed() contract.Limits
 	// Release releases contract instance
 	Release()
+	// Abort terminates running contract with error message
+	Abort(msg string)
 }
 
 // XBridge 用于注册用户虚拟机以及向Xchain Core注册可被识别的vm.VirtualMachine
@@ -33,12 +35,13 @@ type XBridge struct {
 // New instances a new XBridge
 func New() *XBridge {
 	ctxmgr := NewContextManager()
-	syscallService := NewSyscallService(ctxmgr)
-	return &XBridge{
-		ctxmgr:         ctxmgr,
-		syscallService: syscallService,
-		vms:            make(map[string]contract.VirtualMachine),
+	xbridge := &XBridge{
+		ctxmgr: ctxmgr,
+		vms:    make(map[string]contract.VirtualMachine),
 	}
+	syscallService := NewSyscallService(ctxmgr, xbridge)
+	xbridge.syscallService = syscallService
+	return xbridge
 }
 
 func (v *XBridge) convertToVM(name string, exec Executor) contract.VirtualMachine {

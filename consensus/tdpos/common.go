@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/xuperchain/xuperunion/common"
+	cons_base "github.com/xuperchain/xuperunion/consensus/base"
 	"github.com/xuperchain/xuperunion/contract"
 	"github.com/xuperchain/xuperunion/pb"
 )
@@ -56,8 +57,69 @@ func (tp *TDpos) isProposer(term int64, pos int64, address []byte) bool {
 	return string(address) == proposers[pos].Address
 }
 
+// getProposer return the proposer of given term,pos
+func (tp *TDpos) getProposer(term int64, pos int64) (string, error) {
+	if term == 0 {
+		if len(tp.config.initProposer[1]) <= 0 {
+			tp.log.Warn("TDpos getTermProposer error, no proposer in term 1")
+			return "", errors.New("no proposer in term 1")
+		}
+		return tp.config.initProposer[1][0].Address, nil
+	}
+	proposers := tp.getTermProposer(term)
+	tp.log.Trace("TDpos getTermProposer result", "term", term, "proposers", proposers)
+	if proposers == nil {
+		tp.log.Warn("TDpos getTermProposer error", "term", term)
+		return "", errors.New("no proposer found")
+	}
+	if pos < 0 || pos > int64(len(proposers)-1) {
+		tp.log.Warn("TDpos getTermProposer error, pos index out of range", "pos", pos, "proposers", proposers)
+		return "", errors.New("invalid pos")
+	}
+	return proposers[pos].Address, nil
+}
+
+// getNextProposer return the next block proposer of given term,pos
+func (tp *TDpos) getNextProposer(term int64, pos int64, blockPos int64) (string, error) {
+	if term == 0 {
+		if len(tp.config.initProposer[1]) <= 0 {
+			tp.log.Warn("TDpos getTermProposer error, no proposer in term 1")
+			return "", errors.New("no proposer in term 1")
+		}
+		return tp.config.initProposer[1][0].Address, nil
+	}
+
+	proposers := tp.getTermProposer(term)
+	tp.log.Trace("TDpos getTermProposer result", "term", term, "proposers", proposers)
+	if proposers == nil {
+		tp.log.Warn("TDpos getTermProposer error", "term", term)
+		return "", errors.New("no proposer found")
+	}
+
+	// current proposer is the last proposer of this term
+	if pos >= int64(len(proposers)) {
+		proposers := tp.getTermProposer(term + 1)
+		if proposers == nil {
+			tp.log.Warn("TDpos getTermProposer error", "term", term+1)
+			return "", errors.New("no proposer found")
+		}
+		return proposers[0].Address, nil
+	} else if pos < 0 {
+		tp.log.Warn("TDpos getTermProposer error, pos index out of range", "pos", pos, "proposers", proposers)
+		return "", errors.New("invalid pos")
+	}
+
+	// leader not changed
+	if blockPos <= tp.config.blockNum {
+		return proposers[pos].Address, nil
+	}
+
+	// return next proposer of current term
+	return proposers[(pos+1)%int64(len(proposers))].Address, nil
+}
+
 // 查询当前轮的验证者名单
-func (tp *TDpos) getTermProposer(term int64) []*CandidateInfo {
+func (tp *TDpos) getTermProposer(term int64) []*cons_base.CandidateInfo {
 	if term == 1 {
 		return tp.config.initProposer[1]
 	}
@@ -68,6 +130,7 @@ func (tp *TDpos) getTermProposer(term int64) []*CandidateInfo {
 		return nil
 	} else if common.NormalizedKVError(err) == common.ErrKVNotFound {
 		it := tp.utxoVM.ScanWithPrefix([]byte(genTermCheckKeyPrefix(tp.version)))
+		defer it.Release()
 		if it.Last() {
 			termLast, err := parseTermCheckKey(string(it.Key()))
 			tp.log.Trace("TDpos getTermProposer ", "termLast", string(it.Key()))
@@ -97,7 +160,7 @@ func (tp *TDpos) getTermProposer(term int64) []*CandidateInfo {
 			return tp.config.initProposer[1]
 		}
 	}
-	proposers := []*CandidateInfo{}
+	proposers := []*cons_base.CandidateInfo{}
 	err = json.Unmarshal(val, &proposers)
 	if err != nil {
 		tp.log.Error("TDpos Unmarshal vote result error", "term", term, "error", err)
@@ -108,10 +171,10 @@ func (tp *TDpos) getTermProposer(term int64) []*CandidateInfo {
 }
 
 // 生成当前轮的验证者名单
-func (tp *TDpos) genTermProposer() ([]*CandidateInfo, error) {
+func (tp *TDpos) genTermProposer() ([]*cons_base.CandidateInfo, error) {
 	//var res []string
 	var termBallotSli termBallotsSlice
-	res := []*CandidateInfo{}
+	res := []*cons_base.CandidateInfo{}
 
 	tp.candidateBallots.Range(func(k, v interface{}) bool {
 		key := k.(string)
@@ -145,7 +208,7 @@ func (tp *TDpos) genTermProposer() ([]*CandidateInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		var canInfo *CandidateInfo
+		var canInfo *cons_base.CandidateInfo
 		err = json.Unmarshal(ciValue, &canInfo)
 		if err != nil {
 			return nil, err
@@ -213,6 +276,9 @@ func (tp *TDpos) validateVote(desc *contract.TxDesc) (*voteInfo, error) {
 	if int64(len(voteInfo.candidates)) > tp.config.proposerNum {
 		return nil, errors.New("candidates nums should less than proposer nums")
 	}
+	if len(desc.Tx.TxInputs) <= 0 {
+		return nil, errors.New("when voting, TxInput should not be nil")
+	}
 	voteInfo.voter = string(desc.Tx.TxInputs[0].FromAddr)
 	tp.log.Trace("validateVote success", "voteInfo", voteInfo)
 	return voteInfo, nil
@@ -278,15 +344,18 @@ func (tp *TDpos) inCandidate(candidate string) bool {
 }
 
 // 验证提名候选人合约参数是否合法
-func (tp *TDpos) validateNominateCandidate(desc *contract.TxDesc) (*CandidateInfo, string, error) {
+func (tp *TDpos) validateNominateCandidate(desc *contract.TxDesc) (*cons_base.CandidateInfo, string, error) {
 	utxoTotal := tp.utxoVM.GetTotal()
 	amount, err := calAmount(desc.Tx)
 	if err != nil {
 		return nil, "", err
 	}
 	// TODO: zq 多来源以后, 这里需要优化一下
+	if len(desc.Tx.TxInputs) <= 0 {
+		return nil, "", errors.New("validateNominateCandidate TxInput should not be nil")
+	}
 	fromAddr := string(desc.Tx.TxInputs[0].FromAddr)
-	canInfo := &CandidateInfo{}
+	canInfo := &cons_base.CandidateInfo{}
 
 	utxoTotal.Div(utxoTotal, big.NewInt(minNominateProportion))
 	if ok := amount.Cmp(utxoTotal) >= 0; !ok {
@@ -300,7 +369,7 @@ func (tp *TDpos) validateNominateCandidate(desc *contract.TxDesc) (*CandidateInf
 		return nil, "", errors.New("validateNominateCandidate candidate can not be null")
 	}
 	if candidate, ok := desc.Args["candidate"].(string); ok {
-		if checkCandidateName(candidate) {
+		if !checkCandidateName(candidate) {
 			return nil, "", errors.New("validateNominateCandidate candidate name invalid")
 		}
 		canInfo.Address = candidate
@@ -345,6 +414,9 @@ func (tp *TDpos) validateRevokeCandidate(desc *contract.TxDesc) (string, string,
 	candidate, ok := descNom.Args["candidate"].(string)
 	if !ok {
 		return "", "", "", errors.New("candidates should be string")
+	}
+	if len(descNom.Tx.TxInputs) <= 0 {
+		return "", "", "", errors.New("when validateRevokeCandidate, TxInputs should not be nil")
 	}
 	fromAddr := string(descNom.Tx.TxInputs[0].FromAddr)
 	return candidate, fromAddr, hex.EncodeToString(descNom.Tx.Txid), nil
